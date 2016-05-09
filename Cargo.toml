@@ -1,0 +1,15 @@
+[package]
+name = "nwschart"
+version = "0.1.0"
+authors = ["Matt Jones <jonesmr@gmail.com>"]
+
+[[bin]]
+name = "nwschart-server"
+path = "src/server.rs"
+
+[dependencies]
+handlebars = "*"
+hyper = "*"
+rustc-serialize = "*"
+time = "*"
+xmltree = "*"
