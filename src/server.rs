@@ -10,10 +10,12 @@ use hyper::header::UserAgent;
 use hyper::server::Request;
 use hyper::server::Response;
 use rustc_serialize::json;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use std::str::FromStr;
 use time::strptime;
 use xmltree::Element;
 
@@ -24,6 +26,97 @@ pub struct DataPoint {
     precipitation_chance: i32,
     dew_point: i32,
     relative_humidity: i32,
+}
+
+fn parse_region<T: FromStr + Debug>(
+    e: &xmltree::Element,
+    predicate: &(Fn(&xmltree::Element) -> bool)) -> Vec<Option<T>>
+    where <T as FromStr>::Err: Debug
+{
+    let mut res = vec![];
+
+    for child in &(e.children) {
+        if predicate(&child) {
+            for point in &(child.children) {
+                match point.text {
+                    Some(ref text) => res.push(Some(
+                        text.parse().expect("parsing"))),
+                    None => res.push(None),
+                }
+            }
+        }
+    }
+    
+    return res
+}
+
+fn matches(e: Option<&String>, val: &str) -> bool{
+    return e.is_some() && e.unwrap() == &String::from(val);
+}
+
+fn parse_xml(data: &String) -> Vec<DataPoint> {
+    let data = Element::parse(data.as_bytes()).unwrap();
+
+    let time_layout = data
+        .get_child("data").expect("data")
+        .get_child("time-layout").expect("time-layout");
+
+    let location_params = data
+        .get_child("data").expect("data")
+        .get_child("parameters").expect("parameters");
+
+    let mut timestamps = vec![];
+    for time_layout_elem in &time_layout.children {
+        if time_layout_elem.name == "start-valid-time" {
+            let str = time_layout_elem.text.as_ref().expect("time-value");
+            // TODO(mrjones): this is dropping the timezone
+            // since it is formatted as "-04:00" instead of "-0400"
+            let tm = strptime(str, "%Y-%m-%dT%H:%M:%S%z")
+                .expect(format!("parsing: {}", str).as_ref());
+            timestamps.push(tm);
+        }
+    }
+
+    let temps = parse_region::<i32>(
+        &location_params,
+        &|e| e.name == "temperature" &&
+             matches(e.attributes.get("type"), "hourly"));
+
+    let precip_pcts = parse_region::<i32>(
+        &location_params,
+        &|e| e.name == "probability-of-precipitation");
+
+    let dew_points = parse_region::<i32>(
+        &location_params,
+        &|e| e.name == "temperature" &&
+             matches(e.attributes.get("type"), "dew point"));
+
+    let humidities = parse_region::<i32>(
+        &location_params,
+        &|e| e.name == "humidity" &&
+             matches(e.attributes.get("type"), "relative"));
+
+    let mut points = vec![];
+
+    println!("# times: {}, # temps: {}", timestamps.len(), temps.len());
+    println!("# times: {}, # precip_pcts: {}", timestamps.len(), precip_pcts.len());
+    assert_eq!(timestamps.len(), temps.len());
+    assert_eq!(timestamps.len(), precip_pcts.len());
+    assert_eq!(timestamps.len(), dew_points.len());
+    assert_eq!(timestamps.len(), humidities.len());
+    for i in 0..temps.len() {
+        if temps[i].is_some() && precip_pcts[i].is_some() && dew_points[i].is_some() && humidities[i].is_some() {
+            points.push(DataPoint {
+                unix_seconds: timestamps[i].to_timespec().sec,
+                temperature: temps[i].unwrap(),
+                precipitation_chance: precip_pcts[i].unwrap(),
+                dew_point: dew_points[i].unwrap(),
+                relative_humidity: humidities[i].unwrap(),
+            });
+        };
+    }
+
+    return points;
 }
 
 fn json_data() -> String {
@@ -47,104 +140,7 @@ fn json_data() -> String {
     let mut logfile = File::create("/tmp/lastresponse.txt").unwrap();
     logfile.write_all(body.as_bytes()).unwrap();
 
-
-    let data = Element::parse(body.as_bytes()).unwrap();
-
-    let time_layout = data
-        .get_child("data").expect("data")
-        .get_child("time-layout").expect("time-layout");
-
-    let location_params = data
-        .get_child("data").expect("data")
-        .get_child("parameters").expect("parameters");
-
-    let mut timestamps = vec![];
-    for time_layout_elem in &time_layout.children {
-        if time_layout_elem.name == "start-valid-time" {
-            let str = time_layout_elem.text.as_ref().expect("time-value");
-            // TODO(mrjones): this is dropping the timezone
-            // since it is formatted as "-04:00" instead of "-0400"
-            let tm = strptime(str, "%Y-%m-%dT%H:%M:%S%z")
-                .expect(format!("parsing: {}", str).as_ref());
-            timestamps.push(tm);
-        }
-    }
-
-    let mut temps = vec![];
-    for metric in &location_params.children {
-        if metric.name == "temperature" &&
-            metric.attributes.get("type") == Some(&"hourly".to_string()) {
-            for point in &metric.children {
-                match point.text {
-                    Some(ref txt) => temps.push(Some(
-                        txt.parse::<i32>().expect("parsing"))),
-                    None => temps.push(None),
-                }
-            }
-        }
-    }
-
-    let mut precip_pcts = vec![];
-    for metric in &location_params.children {
-        if metric.name == "probability-of-precipitation" {
-            for point in &metric.children {
-                match point.text {
-                    Some(ref txt) => precip_pcts.push(Some(
-                        txt.parse::<i32>().expect("parsing"))),
-                    None => precip_pcts.push(None),
-                }
-            }
-        }
-    }
-
-    let mut dew_points = vec![];
-    for metric in &location_params.children {
-        if metric.name == "temperature" &&
-            metric.attributes.get("type").unwrap_or(&String::from("")) == "dew point" {
-            for point in &metric.children {
-                match point.text {
-                    Some(ref txt) => dew_points.push(Some(
-                        txt.parse::<i32>().expect("parsing"))),
-                    None => dew_points.push(None),
-                }
-            }
-        }
-    }
-
-    let mut humidities = vec![];
-    for metric in &location_params.children {
-        if metric.name == "humidity" &&
-            metric.attributes.get("type").unwrap_or(&String::from("")) == "relative" {
-            for point in &metric.children {
-                match point.text {
-                    Some(ref txt) => humidities.push(Some(
-                        txt.parse::<i32>().expect("parsing"))),
-                    None => humidities.push(None),
-                }
-            }
-        }
-    }
-
-    let mut points = vec![];
-
-    println!("# times: {}, # temps: {}", timestamps.len(), temps.len());
-    println!("# times: {}, # precip_pcts: {}", timestamps.len(), precip_pcts.len());
-    assert_eq!(timestamps.len(), temps.len());
-    assert_eq!(timestamps.len(), precip_pcts.len());
-    assert_eq!(timestamps.len(), dew_points.len());
-    assert_eq!(timestamps.len(), humidities.len());
-    for i in 0..temps.len() {
-        if temps[i].is_some() && precip_pcts[i].is_some() && dew_points[i].is_some() && humidities[i].is_some() {
-            points.push(DataPoint {
-                unix_seconds: timestamps[i].to_timespec().sec,
-                temperature: temps[i].unwrap(),
-                precipitation_chance: precip_pcts[i].unwrap(),
-                dew_point: dew_points[i].unwrap(),
-                relative_humidity: humidities[i].unwrap(),
-            });
-        };
-    }
-
+    let points = parse_xml(&body);
     return json::encode(&points).expect("json encode");
 }
 
