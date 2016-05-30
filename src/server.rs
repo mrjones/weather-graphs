@@ -10,7 +10,9 @@ use hyper::header::UserAgent;
 use hyper::server::Request;
 use hyper::server::Response;
 use rustc_serialize::json;
+use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 use time::strptime;
 use xmltree::Element;
@@ -19,6 +21,9 @@ use xmltree::Element;
 pub struct DataPoint {
     unix_seconds: i64,
     temperature: i32,
+    precipitation_chance: i32,
+    dew_point: i32,
+    relative_humidity: i32,
 }
 
 fn json_data() -> String {
@@ -38,6 +43,10 @@ fn json_data() -> String {
 
     let mut body = String::new();
     nws_reply.read_to_string(&mut body).unwrap();
+
+    let mut logfile = File::create("/tmp/lastresponse.txt").unwrap();
+    logfile.write_all(body.as_bytes()).unwrap();
+
 
     let data = Element::parse(body.as_bytes()).unwrap();
 
@@ -66,9 +75,52 @@ fn json_data() -> String {
         if metric.name == "temperature" &&
             metric.attributes.get("type") == Some(&"hourly".to_string()) {
             for point in &metric.children {
-                temps.push(
-                    point.text.clone().expect("temp value")
-                    .parse::<i32>().expect("parse"));
+                match point.text {
+                    Some(ref txt) => temps.push(Some(
+                        txt.parse::<i32>().expect("parsing"))),
+                    None => temps.push(None),
+                }
+            }
+        }
+    }
+
+    let mut precip_pcts = vec![];
+    for metric in &location_params.children {
+        if metric.name == "probability-of-precipitation" {
+            for point in &metric.children {
+                match point.text {
+                    Some(ref txt) => precip_pcts.push(Some(
+                        txt.parse::<i32>().expect("parsing"))),
+                    None => precip_pcts.push(None),
+                }
+            }
+        }
+    }
+
+    let mut dew_points = vec![];
+    for metric in &location_params.children {
+        if metric.name == "temperature" &&
+            metric.attributes.get("type").unwrap_or(&String::from("")) == "dew point" {
+            for point in &metric.children {
+                match point.text {
+                    Some(ref txt) => dew_points.push(Some(
+                        txt.parse::<i32>().expect("parsing"))),
+                    None => dew_points.push(None),
+                }
+            }
+        }
+    }
+
+    let mut humidities = vec![];
+    for metric in &location_params.children {
+        if metric.name == "humidity" &&
+            metric.attributes.get("type").unwrap_or(&String::from("")) == "relative" {
+            for point in &metric.children {
+                match point.text {
+                    Some(ref txt) => humidities.push(Some(
+                        txt.parse::<i32>().expect("parsing"))),
+                    None => humidities.push(None),
+                }
             }
         }
     }
@@ -76,12 +128,21 @@ fn json_data() -> String {
     let mut points = vec![];
 
     println!("# times: {}, # temps: {}", timestamps.len(), temps.len());
+    println!("# times: {}, # precip_pcts: {}", timestamps.len(), precip_pcts.len());
     assert_eq!(timestamps.len(), temps.len());
+    assert_eq!(timestamps.len(), precip_pcts.len());
+    assert_eq!(timestamps.len(), dew_points.len());
+    assert_eq!(timestamps.len(), humidities.len());
     for i in 0..temps.len() {
-        points.push(DataPoint {
-            unix_seconds: timestamps[i].to_timespec().sec,
-            temperature: temps[i],
-        });
+        if temps[i].is_some() && precip_pcts[i].is_some() && dew_points[i].is_some() && humidities[i].is_some() {
+            points.push(DataPoint {
+                unix_seconds: timestamps[i].to_timespec().sec,
+                temperature: temps[i].unwrap(),
+                precipitation_chance: precip_pcts[i].unwrap(),
+                dew_point: dew_points[i].unwrap(),
+                relative_humidity: humidities[i].unwrap(),
+            });
+        };
     }
 
     return json::encode(&points).expect("json encode");
