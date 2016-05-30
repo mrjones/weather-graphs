@@ -19,13 +19,25 @@ use std::str::FromStr;
 use time::strptime;
 use xmltree::Element;
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Clone, RustcDecodable, RustcEncodable)]
 pub struct DataPoint {
     unix_seconds: i64,
     temperature: i32,
     precipitation_chance: i32,
     dew_point: i32,
     relative_humidity: i32,
+}
+
+impl DataPoint {
+    fn new() -> DataPoint {
+        return DataPoint{
+            unix_seconds: 0,
+            temperature: 0,
+            precipitation_chance: 0,
+            dew_point: 0,
+            relative_humidity: 0,
+        };
+    }
 }
 
 fn parse_region<T: FromStr + Debug>(
@@ -48,6 +60,14 @@ fn parse_region<T: FromStr + Debug>(
     }
     
     return res
+}
+
+fn fill_in<T>(vals: Vec<T>, output: &mut Vec<DataPoint>,
+           copy_fn: &(Fn(&T, &mut DataPoint))) {
+    assert_eq!(vals.len(), output.len());
+    for i in 0..vals.len() {
+        copy_fn(&vals[i], &mut output[i]);
+    }
 }
 
 fn matches(e: Option<&String>, val: &str) -> bool{
@@ -76,7 +96,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
             timestamps.push(tm);
         }
     }
-
+    
     let temps = parse_region::<i32>(
         &location_params,
         &|e| e.name == "temperature" &&
@@ -96,25 +116,37 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
         &|e| e.name == "humidity" &&
              matches(e.attributes.get("type"), "relative"));
 
-    let mut points = vec![];
+    let mut points : Vec<DataPoint> = vec![];
+    points.resize(timestamps.len(), DataPoint::new());
 
-    println!("# times: {}, # temps: {}", timestamps.len(), temps.len());
-    println!("# times: {}, # precip_pcts: {}", timestamps.len(), precip_pcts.len());
-    assert_eq!(timestamps.len(), temps.len());
-    assert_eq!(timestamps.len(), precip_pcts.len());
-    assert_eq!(timestamps.len(), dew_points.len());
-    assert_eq!(timestamps.len(), humidities.len());
-    for i in 0..temps.len() {
-        if temps[i].is_some() && precip_pcts[i].is_some() && dew_points[i].is_some() && humidities[i].is_some() {
-            points.push(DataPoint {
-                unix_seconds: timestamps[i].to_timespec().sec,
-                temperature: temps[i].unwrap(),
-                precipitation_chance: precip_pcts[i].unwrap(),
-                dew_point: dew_points[i].unwrap(),
-                relative_humidity: humidities[i].unwrap(),
-            });
-        };
-    }
+    fill_in(timestamps, &mut points,
+            &|ts, ref mut pt| pt.unix_seconds = ts.to_timespec().sec.clone());
+    fill_in(temps, &mut points,
+            &|temp, ref mut pt| pt.temperature = temp.unwrap_or(0));
+    fill_in(precip_pcts, &mut points,
+            &|pp, ref mut pt| pt.precipitation_chance = pp.unwrap_or(0));
+    fill_in(dew_points, &mut points,
+            &|dp, ref mut pt| pt.dew_point = dp.unwrap_or(0));
+    fill_in(humidities, &mut points,
+            &|h, ref mut pt| pt.relative_humidity = h.unwrap_or(0));
+
+//    println!("# times: {}, # temps: {}", timestamps.len(), temps.len());
+//    println!("# times: {}, # precip_pcts: {}", timestamps.len(), precip_pcts.len());
+//    assert_eq!(timestamps.len(), temps.len());
+//    assert_eq!(timestamps.len(), precip_pcts.len());
+//    assert_eq!(timestamps.len(), dew_points.len());
+//    assert_eq!(timestamps.len(), humidities.len());
+//    for i in 0..temps.len() {
+//        if temps[i].is_some() && precip_pcts[i].is_some() && dew_points[i].is_some() && humidities[i].is_some() {
+//            points.push(DataPoint {
+//                unix_seconds: timestamps[i].to_timespec().sec,
+//                temperature: temps[i].unwrap(),
+//                precipitation_chance: precip_pcts[i].unwrap(),
+//                dew_point: dew_points[i].unwrap(),
+//                relative_humidity: humidities[i].unwrap(),
+//            });
+//        };
+//    }
 
     return points;
 }
