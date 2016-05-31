@@ -26,6 +26,8 @@ pub struct DataPoint {
     precipitation_chance: i32,
     dew_point: i32,
     relative_humidity: i32,
+    clouds: i32,
+    wind: i32,
 }
 
 impl DataPoint {
@@ -36,6 +38,8 @@ impl DataPoint {
             precipitation_chance: 0,
             dew_point: 0,
             relative_humidity: 0,
+            clouds: 0,
+            wind: 0,
         };
     }
 }
@@ -116,6 +120,15 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
         &|e| e.name == "humidity" &&
              matches(e.attributes.get("type"), "relative"));
 
+    let clouds = parse_region::<i32>(
+        &location_params,
+        &|e| e.name == "cloud-amount");
+
+    let wind = parse_region::<i32>(
+        &location_params,
+        &|e| e.name == "wind-speed" &&
+             matches(e.attributes.get("type"), "sustained"));
+
     let mut points : Vec<DataPoint> = vec![];
     points.resize(timestamps.len(), DataPoint::new());
 
@@ -129,6 +142,10 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
             &|dp, ref mut pt| pt.dew_point = dp.unwrap_or(0));
     fill_in(humidities, &mut points,
             &|h, ref mut pt| pt.relative_humidity = h.unwrap_or(0));
+    fill_in(clouds, &mut points,
+            &|c, ref mut pt| pt.clouds = c.unwrap_or(0));
+    fill_in(wind, &mut points,
+            &|w, ref mut pt| pt.wind = w.unwrap_or(0));
 
     return points;
 }
