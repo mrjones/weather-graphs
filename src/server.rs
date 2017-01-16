@@ -66,12 +66,22 @@ fn parse_region<T: FromStr + Debug>(
     return res
 }
 
-fn fill_in<T>(vals: Vec<T>, output: &mut Vec<DataPoint>,
-           copy_fn: &(Fn(&T, &mut DataPoint))) {
+fn fill_in<T>(vals: Vec<Option<T>>, output: &mut Vec<DataPoint>,
+              copy_fn: &(Fn(&T, &mut DataPoint))) -> usize {
     assert_eq!(vals.len(), output.len());
+
+    let mut valid_count = 0;
     for i in 0..vals.len() {
-        copy_fn(&vals[i], &mut output[i]);
+        match vals[i] {
+            Some(ref v) => {
+                copy_fn(v, &mut output[i]);
+                valid_count = valid_count + 1;
+            }
+            None => {}
+        }
     }
+
+    return valid_count;
 }
 
 fn matches(e: Option<&String>, val: &str) -> bool{
@@ -132,22 +142,27 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
     let mut points : Vec<DataPoint> = vec![];
     points.resize(timestamps.len(), DataPoint::new());
 
-    fill_in(timestamps, &mut points,
-            &|ts, ref mut pt| pt.unix_seconds = ts.to_timespec().sec.clone());
-    fill_in(temps, &mut points,
-            &|temp, ref mut pt| pt.temperature = temp.unwrap_or(0));
-    fill_in(precip_pcts, &mut points,
-            &|pp, ref mut pt| pt.precipitation_chance = pp.unwrap_or(0));
-    fill_in(dew_points, &mut points,
-            &|dp, ref mut pt| pt.dew_point = dp.unwrap_or(0));
-    fill_in(humidities, &mut points,
-            &|h, ref mut pt| pt.relative_humidity = h.unwrap_or(0));
-    fill_in(clouds, &mut points,
-            &|c, ref mut pt| pt.clouds = c.unwrap_or(0));
-    fill_in(wind, &mut points,
-            &|w, ref mut pt| pt.wind = w.unwrap_or(0));
+    for i in 0..timestamps.len() {
+        points[i].unix_seconds = timestamps[i].to_timespec().sec;
+    }
+    
+    let num_valid = vec![
+        fill_in(temps, &mut points,
+                &|temp, ref mut pt| pt.temperature = *temp),
+        fill_in(precip_pcts, &mut points,
+                &|pp, ref mut pt| pt.precipitation_chance = *pp),
+        fill_in(dew_points, &mut points,
+                &|dp, ref mut pt| pt.dew_point = *dp),
+        fill_in(humidities, &mut points,
+                &|h, ref mut pt| pt.relative_humidity = *h),
+        fill_in(clouds, &mut points,
+                &|c, ref mut pt| pt.clouds = *c),
+        fill_in(wind, &mut points,
+                &|w, ref mut pt| pt.wind = *w)
+    ];
 
-    return points;
+    let valid_count = num_valid.into_iter().min().unwrap_or(0);
+    return points.into_iter().take(valid_count).collect();
 }
 
 fn json_data() -> String {
@@ -179,6 +194,8 @@ fn static_page(t: &str) -> String {
     let mut hb = handlebars::Handlebars::new();
     hb.register_template_file("index", &Path::new("./index.html")).ok().unwrap();
     hb.register_template_file("google", &Path::new("./google.js")).ok().unwrap();
+    hb.register_template_file("d3dash_html", &Path::new("./d3dash.html")).ok().unwrap();
+    hb.register_template_file("d3dash_js", &Path::new("./d3dash.js")).ok().unwrap();
 
     let data = {};
     return hb.render(t, &data).expect("hb render");
@@ -188,6 +205,8 @@ fn hello(req: Request, res: Response) {
     println!("{}", req.uri);
     match format!("{}", req.uri).as_ref() {
         "/favicon.ico" => res.send("".as_bytes()).unwrap(),
+        "/d3dash" => res.send(static_page("d3dash_html").as_bytes()).unwrap(),
+        "/d3dash.js" => res.send(static_page("d3dash_js").as_bytes()).unwrap(),
         "/data" => res.send(json_data().as_bytes()).unwrap(),
         "/google.js" => res.send(static_page("google").as_bytes()).unwrap(),
         _ => res.send(static_page("index").as_bytes()).unwrap(),
@@ -196,8 +215,14 @@ fn hello(req: Request, res: Response) {
 }
 
 fn main() {
-    println!("Running...");
-    Server::http("0.0.0.0:3000").unwrap()
+    let port = 3000;
+    
+    println!("--- Running on port {} ---", port);
+    Server::http(
+        std::net::SocketAddr::V4(
+            std::net::SocketAddrV4::new(
+                std::net::Ipv4Addr::new(0, 0, 0, 0),
+                port))).unwrap()
         .handle(hello).unwrap();
     println!("Done.");
 }
