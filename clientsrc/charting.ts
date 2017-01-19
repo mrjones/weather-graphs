@@ -2,7 +2,44 @@ import * as d3 from 'd3';
 import { ScaleLinear, ScaleTime } from 'd3-scale';
 import { Line } from 'd3-shape';
 import { Axis } from 'd3-axis';
+import * as $ from 'jquery';
 
+let width: number = 500;
+let height: number = 60;
+let aspect: number = width / height;
+
+$(document).ready(function() {
+  let chart = d3.select('body').append('svg');
+  chart.attr('width', '100%')
+       .attr('viewBox', '0 0 ' + width + ' ' + height)
+       .attr('preserveAspectRatio', 'xMidYMid meet');
+  resize(chart);
+
+  d3.select(window)
+    .on("resize", function() {
+      resize(chart);
+    });
+
+  let tempChart = setupTemperatureChart({
+    width: width,
+    height: height,
+    axisSize: 20,
+    margin: 1,
+  });
+
+  d3.json('/data', function(data) {
+    console.log(JSON.stringify(data[0]));
+    drawTemperatureChart(chart, tempChart, data);
+  });
+});
+
+let resize = function(chartElt) {
+  console.log(chartElt.node().getBoundingClientRect());
+  let targetWidth: number = chartElt.node().getBoundingClientRect().width;
+  chartElt.attr("width", targetWidth);
+  chartElt.attr("height", targetWidth / aspect);
+};
+  
 export class DataPoint {
   public unix_seconds: number;
   public temperature: number;
