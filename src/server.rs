@@ -14,7 +14,6 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
 use std::str::FromStr;
 use time::strptime;
 use xmltree::Element;
@@ -191,26 +190,50 @@ fn json_data() -> String {
 }
 
 fn static_page(t: &str) -> String {
+    let mut f = std::fs::File::open(t).expect(
+        format!("Opening file: {}", t).as_str());
+    let mut s = String::new();
+    f.read_to_string(&mut s).expect(format!("Reading file: {}", t).as_str());
+    return s;
+}
+
+/*
+    
     let mut hb = handlebars::Handlebars::new();
     hb.register_template_file("index", &Path::new("./index.html")).ok().unwrap();
     hb.register_template_file("google", &Path::new("./google.js")).ok().unwrap();
-    hb.register_template_file("d3dash_html", &Path::new("./d3dash.html")).ok().unwrap();
-    hb.register_template_file("d3dash_js", &Path::new("./d3dash.js")).ok().unwrap();
+    hb.register_template_file("d3dash_html", &Path::new("./d3dash.html")).ok().expect("d3dash.html");
+    hb.register_template_file("d3dash_js", &Path::new("./d3dash.js")).ok().expect("d3dash.js");
+    hb.register_template_file("nws_js", &Path::new("./nws.js")).expect("nws.js");
 
     let data = {};
     return hb.render(t, &data).expect("hb render");
 }
+*/
 
 fn hello(req: Request, res: Response) {
     println!("{}", req.uri);
     match format!("{}", req.uri).as_ref() {
         "/favicon.ico" => res.send("".as_bytes()).unwrap(),
+        "/d3dash" => res.send(static_page("d3dash.html").as_bytes()).unwrap(),
+        "/d3dash.js" => res.send(static_page("d3dash.js").as_bytes()).unwrap(),
+        "/nws.js" => res.send(static_page("nws.js").as_bytes()).unwrap(),
+        "/data" => res.send(json_data().as_bytes()).unwrap(),
+        "/google.js" => res.send(static_page("google.js").as_bytes()).unwrap(),
+        _ => res.send(static_page("index.html").as_bytes()).unwrap(),
+    }
+
+    /*
+    match format!("{}", req.uri).as_ref() {
+        "/favicon.ico" => res.send("".as_bytes()).unwrap(),
         "/d3dash" => res.send(static_page("d3dash_html").as_bytes()).unwrap(),
         "/d3dash.js" => res.send(static_page("d3dash_js").as_bytes()).unwrap(),
+        "/nws.js" => res.send(static_page("nws_js").as_bytes()).unwrap(),
         "/data" => res.send(json_data().as_bytes()).unwrap(),
         "/google.js" => res.send(static_page("google").as_bytes()).unwrap(),
         _ => res.send(static_page("index").as_bytes()).unwrap(),
     }
+     */
 
 }
 
