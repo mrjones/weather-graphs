@@ -1,5 +1,7 @@
 import * as d3 from 'd3';
 import { ScaleLinear, ScaleTime } from 'd3-scale';
+import { Line } from 'd3-shape';
+import { Axis } from 'd3-axis';
 
 export class DataPoint {
   public unix_seconds: number;
@@ -16,11 +18,11 @@ export class ChartBounds {
 
 export class TemperatureChartSpec {
   public bounds: ChartBounds;
-  public line: any;
+  public line: Line<DataPoint>;
   public x: ScaleTime<number, number>;
   public y: ScaleLinear<number, number>;
-  public xAxis: any;
-  public yAxis: any;
+  public xAxis: Axis<Date>;
+  public yAxis: Axis<number>;
 };
 
 export let setupTemperatureChart = function(bounds: ChartBounds): TemperatureChartSpec {
@@ -31,9 +33,9 @@ export let setupTemperatureChart = function(bounds: ChartBounds): TemperatureCha
     [bounds.height - bounds.axisSize - bounds.margin,
      bounds.margin]);
 
-  let yAxis = d3.axisLeft(y)
+  let yAxis = d3.axisLeft<number>(y)
     .ticks(3);
-  let xAxis = d3.axisBottom(x)
+  let xAxis = d3.axisBottom<Date>(x)
     .ticks(d3.timeDay.every(1))
     .tickFormat(d3.timeFormat("%b %d"));
   let line = d3.line<DataPoint>()
