@@ -1,6 +1,6 @@
 // webpack --watch
 module.exports = {
-  entry: './clientsrc/d3_legacy.js',
+  entry: './clientsrc/charting.ts',
   output: {
     filename: 'nws.js'
   },

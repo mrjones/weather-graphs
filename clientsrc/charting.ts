@@ -4,6 +4,28 @@ import { Line } from 'd3-shape';
 import { Axis } from 'd3-axis';
 import * as $ from 'jquery';
 
+class DataPoint {
+  public unix_seconds: number;
+  public temperature: number;
+  public precipitation_chance: number;
+}
+
+class ChartBounds {
+    public width: number;
+    public height: number;
+    public axisSize: number;
+    public margin: number;
+}
+
+class TemperatureChartSpec {
+  public bounds: ChartBounds;
+  public line: Line<DataPoint>;
+  public x: ScaleTime<number, number>;
+  public y: ScaleLinear<number, number>;
+  public xAxis: Axis<Date>;
+  public yAxis: Axis<number>;
+};
+
 let width: number = 500;
 let height: number = 60;
 let aspect: number = width / height;
@@ -27,42 +49,20 @@ $(document).ready(function() {
     margin: 1,
   });
 
-  d3.json('/data', function(data) {
+  d3.json('/data', function(data: DataPoint[]) {
     console.log(JSON.stringify(data[0]));
     drawTemperatureChart(chart, tempChart, data);
   });
 });
 
-let resize = function(chartElt) {
+let resize = function(chartElt): void {
   console.log(chartElt.node().getBoundingClientRect());
   let targetWidth: number = chartElt.node().getBoundingClientRect().width;
   chartElt.attr("width", targetWidth);
   chartElt.attr("height", targetWidth / aspect);
 };
-  
-export class DataPoint {
-  public unix_seconds: number;
-  public temperature: number;
-  public precipitation_chance: number;
-}
 
-export class ChartBounds {
-    public width: number;
-    public height: number;
-    public axisSize: number;
-    public margin: number;
-}
-
-export class TemperatureChartSpec {
-  public bounds: ChartBounds;
-  public line: Line<DataPoint>;
-  public x: ScaleTime<number, number>;
-  public y: ScaleLinear<number, number>;
-  public xAxis: Axis<Date>;
-  public yAxis: Axis<number>;
-};
-
-export let setupTemperatureChart = function(bounds: ChartBounds): TemperatureChartSpec {
+let setupTemperatureChart = function(bounds: ChartBounds): TemperatureChartSpec {
   let x: ScaleTime<number, number> = d3.scaleTime().range(
     [bounds.axisSize + bounds.margin,
      bounds.width - bounds.margin]);
@@ -89,15 +89,15 @@ export let setupTemperatureChart = function(bounds: ChartBounds): TemperatureCha
   };
 };
 
-export let selectMaxes = function(data: DataPoint[], valueFn: (DataPoint) => number) {
+let selectMaxes = function(data: DataPoint[], valueFn: (DataPoint) => number) {
   return selectExtremes(data, valueFn, (a, b) => a > b);
 };
 
-export let selectMins = function(data: DataPoint[], valueFn: (DataPoint) => number) {
+let selectMins = function(data: DataPoint[], valueFn: (DataPoint) => number) {
   return selectExtremes(data, valueFn, (a, b) => a < b);
 };
 
-export class Selection {
+class Selection {
   public value: number;
   public time: Date;
 };
@@ -129,7 +129,7 @@ let selectExtremes = function(data: DataPoint[], valueFn: (DataPoint) => number,
   return maxes;
 };
 
-export let makeMidnights = function(startTime: Date, endTime: Date) {
+let makeMidnights = function(startTime: Date, endTime: Date) {
   let results: Date[] = [];
   let t = startTime;
   while (true) {
@@ -148,7 +148,7 @@ let percentToHex = function(pct: number) {
   return Math.floor(((100 - pct) / 100) * 255).toString(16);
 };
 
-export let drawPrecipBar = function(rootElt, chart: TemperatureChartSpec, data: DataPoint[]) {
+let drawPrecipBar = function(rootElt, chart: TemperatureChartSpec, data: DataPoint[]) {
   let precipBarG = rootElt.append('g');
 
   let width: number = 1.05 * (chart.bounds.width - chart.bounds.axisSize - 2 * chart.bounds.margin) / data.length;
@@ -165,7 +165,7 @@ export let drawPrecipBar = function(rootElt, chart: TemperatureChartSpec, data: 
     .attr('fill', (d: DataPoint) => "#" + percentToHex(d.precipitation_chance) + percentToHex(d.precipitation_chance) + 'ff' );
 };
 
-export let drawTempMidnights = function(rootElt, chart: TemperatureChartSpec, midnights: Date[]) {
+let drawTempMidnights = function(rootElt, chart: TemperatureChartSpec, midnights: Date[]) {
   let midnightG = rootElt.selectAll('.tempMidnights')
          .data(midnights)
          .enter()
@@ -189,7 +189,7 @@ export let drawTempMidnights = function(rootElt, chart: TemperatureChartSpec, mi
            .text(d => d3.timeFormat('%b %d')(d));
 };
 
-export let drawTemperatureChart = function(rootElt, chart: TemperatureChartSpec, data: DataPoint[]) {
+let drawTemperatureChart = function(rootElt, chart: TemperatureChartSpec, data: DataPoint[]) {
   let xExtent = d3.extent(data, d => new Date(d.unix_seconds * 1000));
   let yExtent = d3.extent(data, d => d.temperature);
   // TODO(mrjones): The types don't seem to work for using xExtent here
