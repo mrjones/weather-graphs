@@ -113,7 +113,6 @@ export class TemperatureChart {
         d3.min(data, d => new Date(d.unix_seconds * 1000)),
         d3.max(data, d => new Date(d.unix_seconds * 1000))));
 
-    //    this.drawPrecipBar(tempsLineG, data);
     // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
     let precipBar = new IntensityBand<DataPoint>(
       (d: DataPoint) => d.precipitation_chance,
@@ -123,7 +122,8 @@ export class TemperatureChart {
         height: 4,
         xPos: this.bounds.axisSize,
         yPos: this.bounds.height - this.bounds.axisSize,
-      });
+      },
+      "precipBar");
     precipBar.render(tempsLineG, data);
 
     /*
@@ -176,27 +176,6 @@ export class TemperatureChart {
         .style('font-family', 'sans-serif')
         .style('font-size', 4);
     });
-  };
-
-  private drawPrecipBar(rootElt: AnySvgSelection, data: DataPoint[]) {
-    let precipBarG = rootElt.append('g');
-
-    let width: number = 1.05 * (this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin) / data.length;
-
-    let percentToHex = function(pct: number) {
-      return Math.floor(((100 - pct) / 100) * 255).toString(16);
-    };
-
-    precipBarG.selectAll('.precipPoint')
-      .data(data)
-      .enter()
-      .append('rect')
-      .attr('class', 'precipPoint')
-      .attr('width', width)
-      .attr('height', 4)
-      .attr('x', d => this.xScale(new Date(d.unix_seconds * 1000)))
-      .attr('y', this.bounds.height - this.bounds.axisSize)
-      .attr('fill', (d: DataPoint) => "#" + percentToHex(d.precipitation_chance) + percentToHex(d.precipitation_chance) + 'ff' );
   };
 
   private drawTempMidnights(rootElt: AnySvgSelection, midnights: Date[]) {

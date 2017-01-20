@@ -22,19 +22,20 @@ export class IntensityBand<DataPointT> {
   private intensityFn: CompteIntensityFn<DataPointT>;
   private colorFn: ColorForIntensityFn;
   private bounds: BoundingBox;
+  private className: string;
 
   constructor(intensityFn: CompteIntensityFn<DataPointT>,
               colorFn: ColorForIntensityFn,
-              bounds: BoundingBox) {
+              bounds: BoundingBox,
+              className: string) {
     this.intensityFn = intensityFn;
     this.colorFn = colorFn;
     this.bounds = bounds;
+    this.className = className;
   }
 
   public render(rootElt: Selection<BaseType, {}, HTMLElement, any>,
                 data: DataPointT[]) {
-    let precipBarG = rootElt.append('g');
-
     let markWidth = 1.05 * (this.bounds.width / data.length);
 
     let toHex = function(val: [number, number, number]): string {
@@ -49,10 +50,15 @@ export class IntensityBand<DataPointT> {
       return acc;
     };
 
-    precipBarG.selectAll('.precipPoint')
+    // TODO(mrjones): This probably doesn't belong in render in
+    // order to make this updateable.
+    let precipBarG = rootElt.append('g');
+
+    precipBarG.selectAll('.' + this.className)
       .data(data)
       .enter()
       .append('rect')
+      .attr('class', this.className)
       .attr('width', markWidth)
       .attr('height', this.bounds.height)
       .attr('x', (d: DataPointT, i: number) => {

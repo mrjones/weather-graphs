@@ -120,14 +120,13 @@
 	        var tempsLineG = rootElt.append('g')
 	            .attr('class', 'tempsLineG');
 	        this.drawTempMidnights(tempsLineG, utils.midnightsBetween(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
-	        //    this.drawPrecipBar(tempsLineG, data);
 	        // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
 	        var precipBar = new intensity_band_1.IntensityBand(function (d) { return d.precipitation_chance; }, intensity.blue, {
 	            width: this.bounds.width - this.bounds.axisSize,
 	            height: 4,
 	            xPos: this.bounds.axisSize,
 	            yPos: this.bounds.height - this.bounds.axisSize
-	        });
+	        }, "precipBar");
 	        precipBar.render(tempsLineG, data);
 	        /*
 	          var xAxisTranslate = {
@@ -174,25 +173,6 @@
 	                .style('font-family', 'sans-serif')
 	                .style('font-size', 4);
 	        });
-	    };
-	    ;
-	    TemperatureChart.prototype.drawPrecipBar = function (rootElt, data) {
-	        var _this = this;
-	        var precipBarG = rootElt.append('g');
-	        var width = 1.05 * (this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin) / data.length;
-	        var percentToHex = function (pct) {
-	            return Math.floor(((100 - pct) / 100) * 255).toString(16);
-	        };
-	        precipBarG.selectAll('.precipPoint')
-	            .data(data)
-	            .enter()
-	            .append('rect')
-	            .attr('class', 'precipPoint')
-	            .attr('width', width)
-	            .attr('height', 4)
-	            .attr('x', function (d) { return _this.xScale(new Date(d.unix_seconds * 1000)); })
-	            .attr('y', this.bounds.height - this.bounds.axisSize)
-	            .attr('fill', function (d) { return "#" + percentToHex(d.precipitation_chance) + percentToHex(d.precipitation_chance) + 'ff'; });
 	    };
 	    ;
 	    TemperatureChart.prototype.drawTempMidnights = function (rootElt, midnights) {
@@ -26928,14 +26908,14 @@
 	    ];
 	};
 	var IntensityBand = (function () {
-	    function IntensityBand(intensityFn, colorFn, bounds) {
+	    function IntensityBand(intensityFn, colorFn, bounds, className) {
 	        this.intensityFn = intensityFn;
 	        this.colorFn = colorFn;
 	        this.bounds = bounds;
+	        this.className = className;
 	    }
 	    IntensityBand.prototype.render = function (rootElt, data) {
 	        var _this = this;
-	        var precipBarG = rootElt.append('g');
 	        var markWidth = 1.05 * (this.bounds.width / data.length);
 	        var toHex = function (val) {
 	            var acc = "#";
@@ -26948,10 +26928,14 @@
 	            });
 	            return acc;
 	        };
-	        precipBarG.selectAll('.precipPoint')
+	        // TODO(mrjones): This probably doesn't belong in render in
+	        // order to make this updateable.
+	        var precipBarG = rootElt.append('g');
+	        precipBarG.selectAll('.' + this.className)
 	            .data(data)
 	            .enter()
 	            .append('rect')
+	            .attr('class', this.className)
 	            .attr('width', markWidth)
 	            .attr('height', this.bounds.height)
 	            .attr('x', function (d, i) {
