@@ -1,3 +1,5 @@
+import { DataPoint } from './model';
+import * as utils from './utils';
 import * as d3 from 'd3';
 import { Axis } from 'd3-axis';
 import { ScaleLinear, ScaleTime } from 'd3-scale';
@@ -5,13 +7,42 @@ import { BaseType, Selection } from 'd3-selection';
 import { Line } from 'd3-shape';
 import * as $ from 'jquery';
 
+$(document).ready(function() {
+  let resize = function(chartElt: SvgSelection<SVGSVGElement>): void {
+    console.log(chartElt.node().getBoundingClientRect());
+    let targetWidth: number = chartElt.node().getBoundingClientRect().width;
+    chartElt.attr("width", targetWidth);
+    chartElt.attr("height", targetWidth / aspect);
+  };
 
+  let chartElt =
+    d3.select('body').append<SVGSVGElement>('svg');
+  chartElt.attr('width', '100%')
+       .attr('viewBox', '0 0 ' + width + ' ' + height)
+       .attr('preserveAspectRatio', 'xMidYMid meet');
+  resize(chartElt);
 
-class DataPoint {
-  public unix_seconds: number;
-  public temperature: number;
-  public precipitation_chance: number;
-}
+  d3.select(window)
+    .on("resize", function() {
+      resize(chartElt);
+    });
+
+  let chart = new TemperatureChart({
+    width: width,
+    height: height,
+    axisSize: 20,
+    margin: 1,
+  });
+
+  d3.json('/data', function(data: DataPoint[]) {
+    console.log(JSON.stringify(data[0]));
+    chart.render(data, chartElt);
+  });
+});
+
+type AnySvgSelection = SvgSelection<BaseType>;
+type SvgSelection<T extends BaseType> = Selection<T, {}, HTMLElement, any>;
+type SvgSvgSelection = SvgSelection<SVGSVGElement>;
 
 class ChartBounds {
     public width: number;
@@ -75,8 +106,9 @@ export class TemperatureChart {
    
     this.drawTempMidnights(
       tempsLineG,
-      makeMidnights(d3.min(data, d => new Date(d.unix_seconds * 1000)),
-                    d3.max(data, d => new Date(d.unix_seconds * 1000))));
+      utils.midnightsBetween(
+        d3.min(data, d => new Date(d.unix_seconds * 1000)),
+        d3.max(data, d => new Date(d.unix_seconds * 1000))));
 
     this.drawPrecipBar(tempsLineG, data);
 
@@ -109,8 +141,8 @@ export class TemperatureChart {
       .attr('d', this.lineSpec);
 
     let minMaxSpecs = [
-      { label: "max", values: selectMaxes(data, d => d.temperature) },
-      { label: "min", values: selectMins(data, d => d.temperature) },
+      { label: "max", values: utils.selectMaxes(data, d => d.temperature) },
+      { label: "min", values: utils.selectMins(data, d => d.temperature) },
     ];
 
     minMaxSpecs.forEach(spec => {
@@ -136,6 +168,10 @@ export class TemperatureChart {
     let precipBarG = rootElt.append('g');
 
     let width: number = 1.05 * (this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin) / data.length;
+
+    let percentToHex = function(pct: number) {
+      return Math.floor(((100 - pct) / 100) * 255).toString(16);
+    };
 
     precipBarG.selectAll('.precipPoint')
       .data(data)
@@ -175,101 +211,3 @@ export class TemperatureChart {
       .text(d => d3.timeFormat('%b %d')(d));
   };
 };
-
-// TODO(mrjones): Figure out how to use these types better
-type AnySvgSelection = SvgSelection<BaseType>;
-type SvgSelection<T extends BaseType> = Selection<T, {}, HTMLElement, any>;
-type SvgSvgSelection = SvgSelection<SVGSVGElement>;
-
-$(document).ready(function() {
-  let chartElt =
-    d3.select('body').append<SVGSVGElement>('svg');
-  chartElt.attr('width', '100%')
-       .attr('viewBox', '0 0 ' + width + ' ' + height)
-       .attr('preserveAspectRatio', 'xMidYMid meet');
-  resize(chartElt);
-
-  d3.select(window)
-    .on("resize", function() {
-      resize(chartElt);
-    });
-
-  let chart = new TemperatureChart({
-    width: width,
-    height: height,
-    axisSize: 20,
-    margin: 1,
-  });
-
-  d3.json('/data', function(data: DataPoint[]) {
-    console.log(JSON.stringify(data[0]));
-    chart.render(data, chartElt);
-  });
-});
-
-let resize = function(chartElt: SvgSelection<SVGSVGElement>): void {
-  console.log(chartElt.node().getBoundingClientRect());
-  let targetWidth: number = chartElt.node().getBoundingClientRect().width;
-  chartElt.attr("width", targetWidth);
-  chartElt.attr("height", targetWidth / aspect);
-};
-
-let selectMaxes = function(data: DataPoint[], valueFn: (DataPoint) => number) {
-  return selectExtremes(data, valueFn, (a, b) => a > b);
-};
-
-let selectMins = function(data: DataPoint[], valueFn: (DataPoint) => number) {
-  return selectExtremes(data, valueFn, (a, b) => a < b);
-};
-
-class SelectedPoint {
-  public value: number;
-  public time: Date;
-};
-
-let selectExtremes = function(data: DataPoint[], valueFn: (DataPoint) => number, greaterThanFn: (n1: number, n2: number) => boolean): SelectedPoint[] {
-  let maxes: SelectedPoint[] = [];
-
-  let risingOrFlat: boolean = false;
-  let lastIncrease: number = -1;
-  for (let i = 1; i < data.length; i++) {
-    if (greaterThanFn(valueFn(data[i]), valueFn(data[i - 1]))) {
-      lastIncrease = i;
-    }
-    if ((!greaterThanFn(valueFn(data[i]), valueFn(data[i - 1])) &&
-         valueFn(data[i]) !== valueFn(data[i - 1]))
-        || (i === data.length - 1)) {
-      if (risingOrFlat && lastIncrease >= 0) {
-        risingOrFlat = false;
-        maxes.push({
-          value: valueFn(data[lastIncrease]),
-          time: new Date(data[lastIncrease].unix_seconds * 1000),
-        });
-      }
-    } else {
-      risingOrFlat = true;
-    }
-  }
-
-  return maxes;
-};
-
-let makeMidnights = function(startTime: Date, endTime: Date): Date[] {
-  let results: Date[] = [];
-  let t = startTime;
-  while (true) {
-    t.setHours(24, 0, 0, 0);
-    if (t > endTime) {
-      break;
-    }
-    results.push(new Date(t));
-  }
-
-  console.log("midnights(" + startTime + "," + endTime + ") => " + results);
-  return results;
-};
-
-let percentToHex = function(pct: number) {
-  return Math.floor(((100 - pct) / 100) * 255).toString(16);
-};
-

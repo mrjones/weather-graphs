@@ -45,13 +45,36 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
+	var utils = __webpack_require__(3);
 	var d3 = __webpack_require__(1);
 	var $ = __webpack_require__(2);
-	var DataPoint = (function () {
-	    function DataPoint() {
-	    }
-	    return DataPoint;
-	}());
+	$(document).ready(function () {
+	    var resize = function (chartElt) {
+	        console.log(chartElt.node().getBoundingClientRect());
+	        var targetWidth = chartElt.node().getBoundingClientRect().width;
+	        chartElt.attr("width", targetWidth);
+	        chartElt.attr("height", targetWidth / aspect);
+	    };
+	    var chartElt = d3.select('body').append('svg');
+	    chartElt.attr('width', '100%')
+	        .attr('viewBox', '0 0 ' + width + ' ' + height)
+	        .attr('preserveAspectRatio', 'xMidYMid meet');
+	    resize(chartElt);
+	    d3.select(window)
+	        .on("resize", function () {
+	        resize(chartElt);
+	    });
+	    var chart = new TemperatureChart({
+	        width: width,
+	        height: height,
+	        axisSize: 20,
+	        margin: 1
+	    });
+	    d3.json('/data', function (data) {
+	        console.log(JSON.stringify(data[0]));
+	        chart.render(data, chartElt);
+	    });
+	});
 	var ChartBounds = (function () {
 	    function ChartBounds() {
 	    }
@@ -94,7 +117,7 @@
 	        this.yScale.domain(yExtent);
 	        var tempsLineG = rootElt.append('g')
 	            .attr('class', 'tempsLineG');
-	        this.drawTempMidnights(tempsLineG, makeMidnights(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
+	        this.drawTempMidnights(tempsLineG, utils.midnightsBetween(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
 	        this.drawPrecipBar(tempsLineG, data);
 	        /*
 	          var xAxisTranslate = {
@@ -121,8 +144,8 @@
 	            .attr('class', 'dataline')
 	            .attr('d', this.lineSpec);
 	        var minMaxSpecs = [
-	            { label: "max", values: selectMaxes(data, function (d) { return d.temperature; }) },
-	            { label: "min", values: selectMins(data, function (d) { return d.temperature; }) },
+	            { label: "max", values: utils.selectMaxes(data, function (d) { return d.temperature; }) },
+	            { label: "min", values: utils.selectMins(data, function (d) { return d.temperature; }) },
 	        ];
 	        minMaxSpecs.forEach(function (spec) {
 	            var maxMarkerG = tempsLineG.selectAll('.' + spec.label + 'Marker')
@@ -147,6 +170,9 @@
 	        var _this = this;
 	        var precipBarG = rootElt.append('g');
 	        var width = 1.05 * (this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin) / data.length;
+	        var percentToHex = function (pct) {
+	            return Math.floor(((100 - pct) / 100) * 255).toString(16);
+	        };
 	        precipBarG.selectAll('.precipPoint')
 	            .data(data)
 	            .enter()
@@ -186,86 +212,6 @@
 	}());
 	exports.TemperatureChart = TemperatureChart;
 	;
-	$(document).ready(function () {
-	    var chartElt = d3.select('body').append('svg');
-	    chartElt.attr('width', '100%')
-	        .attr('viewBox', '0 0 ' + width + ' ' + height)
-	        .attr('preserveAspectRatio', 'xMidYMid meet');
-	    resize(chartElt);
-	    d3.select(window)
-	        .on("resize", function () {
-	        resize(chartElt);
-	    });
-	    var chart = new TemperatureChart({
-	        width: width,
-	        height: height,
-	        axisSize: 20,
-	        margin: 1
-	    });
-	    d3.json('/data', function (data) {
-	        console.log(JSON.stringify(data[0]));
-	        chart.render(data, chartElt);
-	    });
-	});
-	var resize = function (chartElt) {
-	    console.log(chartElt.node().getBoundingClientRect());
-	    var targetWidth = chartElt.node().getBoundingClientRect().width;
-	    chartElt.attr("width", targetWidth);
-	    chartElt.attr("height", targetWidth / aspect);
-	};
-	var selectMaxes = function (data, valueFn) {
-	    return selectExtremes(data, valueFn, function (a, b) { return a > b; });
-	};
-	var selectMins = function (data, valueFn) {
-	    return selectExtremes(data, valueFn, function (a, b) { return a < b; });
-	};
-	var SelectedPoint = (function () {
-	    function SelectedPoint() {
-	    }
-	    return SelectedPoint;
-	}());
-	;
-	var selectExtremes = function (data, valueFn, greaterThanFn) {
-	    var maxes = [];
-	    var risingOrFlat = false;
-	    var lastIncrease = -1;
-	    for (var i = 1; i < data.length; i++) {
-	        if (greaterThanFn(valueFn(data[i]), valueFn(data[i - 1]))) {
-	            lastIncrease = i;
-	        }
-	        if ((!greaterThanFn(valueFn(data[i]), valueFn(data[i - 1])) &&
-	            valueFn(data[i]) !== valueFn(data[i - 1]))
-	            || (i === data.length - 1)) {
-	            if (risingOrFlat && lastIncrease >= 0) {
-	                risingOrFlat = false;
-	                maxes.push({
-	                    value: valueFn(data[lastIncrease]),
-	                    time: new Date(data[lastIncrease].unix_seconds * 1000)
-	                });
-	            }
-	        }
-	        else {
-	            risingOrFlat = true;
-	        }
-	    }
-	    return maxes;
-	};
-	var makeMidnights = function (startTime, endTime) {
-	    var results = [];
-	    var t = startTime;
-	    while (true) {
-	        t.setHours(24, 0, 0, 0);
-	        if (t > endTime) {
-	            break;
-	        }
-	        results.push(new Date(t));
-	    }
-	    console.log("midnights(" + startTime + "," + endTime + ") => " + results);
-	    return results;
-	};
-	var percentToHex = function (pct) {
-	    return Math.floor(((100 - pct) / 100) * 255).toString(16);
-	};
 
 
 /***/ },
@@ -26891,6 +26837,66 @@
 
 	return jQuery;
 	} );
+
+
+/***/ },
+/* 3 */
+/***/ function(module, exports) {
+
+	"use strict";
+	exports.scale = function (d, dMin, dMax, rangeMin, rangeMax) {
+	    return rangeMin + (rangeMax - rangeMin) * ((d - dMin) / (dMax - dMin));
+	};
+	exports.midnightsBetween = function (startTime, endTime) {
+	    var results = [];
+	    var t = startTime;
+	    while (true) {
+	        t.setHours(24, 0, 0, 0);
+	        if (t > endTime) {
+	            break;
+	        }
+	        results.push(new Date(t));
+	    }
+	    console.log("midnights(" + startTime + "," + endTime + ") => " + results);
+	    return results;
+	};
+	exports.selectMaxes = function (data, valueFn) {
+	    return selectExtremes(data, valueFn, function (a, b) { return a > b; });
+	};
+	exports.selectMins = function (data, valueFn) {
+	    return selectExtremes(data, valueFn, function (a, b) { return a < b; });
+	};
+	var SelectedPoint = (function () {
+	    function SelectedPoint() {
+	    }
+	    return SelectedPoint;
+	}());
+	;
+	var selectExtremes = function (data, valueFn, greaterThanFn) {
+	    var maxes = [];
+	    var risingOrFlat = false;
+	    var lastIncrease = -1;
+	    for (var i = 1; i < data.length; i++) {
+	        if (greaterThanFn(valueFn(data[i]), valueFn(data[i - 1]))) {
+	            lastIncrease = i;
+	        }
+	        if ((!greaterThanFn(valueFn(data[i]), valueFn(data[i - 1])) &&
+	            valueFn(data[i]) !== valueFn(data[i - 1]))
+	            || (i === data.length - 1)) {
+	            if (risingOrFlat && lastIncrease >= 0) {
+	                risingOrFlat = false;
+	                maxes.push({
+	                    value: valueFn(data[lastIncrease]),
+	                    time: new Date(data[lastIncrease].unix_seconds * 1000)
+	                });
+	            }
+	        }
+	        else {
+	            risingOrFlat = true;
+	        }
+	    }
+	    return maxes;
+	};
 
 
 /***/ }
