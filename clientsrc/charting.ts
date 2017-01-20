@@ -119,13 +119,24 @@ export class TemperatureChart {
       intensity.blue,
       {
         width: this.bounds.width - this.bounds.axisSize,
-        height: 4,
+        height: 3,
         xPos: this.bounds.axisSize,
         yPos: this.bounds.height - this.bounds.axisSize,
       },
       "precipBar");
     precipBar.render(tempsLineG, data);
 
+    let cloudsBar = new IntensityBand<DataPoint>(
+      (d: DataPoint) => d.clouds,
+      intensity.gray,
+      {
+        width: this.bounds.width - this.bounds.axisSize,
+        height: 3,
+        xPos: this.bounds.axisSize,
+        yPos: this.bounds.height - this.bounds.axisSize + 3,
+      },
+      "cloudsBar");
+    cloudsBar.render(tempsLineG, data);
     /*
       var xAxisTranslate = {
       x: 0,

@@ -123,11 +123,18 @@
 	        // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
 	        var precipBar = new intensity_band_1.IntensityBand(function (d) { return d.precipitation_chance; }, intensity.blue, {
 	            width: this.bounds.width - this.bounds.axisSize,
-	            height: 4,
+	            height: 3,
 	            xPos: this.bounds.axisSize,
 	            yPos: this.bounds.height - this.bounds.axisSize
 	        }, "precipBar");
 	        precipBar.render(tempsLineG, data);
+	        var cloudsBar = new intensity_band_1.IntensityBand(function (d) { return d.clouds; }, intensity.gray, {
+	            width: this.bounds.width - this.bounds.axisSize,
+	            height: 3,
+	            xPos: this.bounds.axisSize,
+	            yPos: this.bounds.height - this.bounds.axisSize + 3
+	        }, "cloudsBar");
+	        cloudsBar.render(tempsLineG, data);
 	        /*
 	          var xAxisTranslate = {
 	          x: 0,
@@ -26905,6 +26912,13 @@
 	        255 * ((100 - intensity) / 100),
 	        255 * ((100 - intensity) / 100),
 	        255,
+	    ];
+	};
+	exports.gray = function (intensity) {
+	    return [
+	        255 * ((100 - intensity) / 100),
+	        255 * ((100 - intensity) / 100),
+	        255 * ((100 - intensity) / 100),
 	    ];
 	};
 	var IntensityBand = (function () {

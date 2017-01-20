@@ -18,6 +18,14 @@ export let blue = function(intensity: number): [number, number, number] {
   ];
 };
 
+export let gray = function(intensity: number): [number, number, number] {
+  return [
+    255 * ((100 - intensity) / 100),
+    255 * ((100 - intensity) / 100),
+    255 * ((100 - intensity) / 100),
+  ];
+};
+
 export class IntensityBand<DataPointT> {
   private intensityFn: CompteIntensityFn<DataPointT>;
   private colorFn: ColorForIntensityFn;
