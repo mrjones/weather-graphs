@@ -26933,7 +26933,7 @@
 	    }
 	    IntensityBand.prototype.render = function (data) {
 	        var _this = this;
-	        var markWidth = 1.05 * (this.bounds.width / data.length);
+	        var markWidth = this.bounds.width / data.length;
 	        var toHex = function (val) {
 	            var acc = "#";
 	            val.forEach(function (v) {
@@ -26950,7 +26950,7 @@
 	            .enter()
 	            .append('rect')
 	            .attr('class', this.className)
-	            .attr('width', markWidth)
+	            .attr('width', 1.01 * markWidth)
 	            .attr('height', this.bounds.height)
 	            .attr('x', function (d, i) {
 	            return _this.bounds.xPos + (i * markWidth);

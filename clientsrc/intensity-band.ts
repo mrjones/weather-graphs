@@ -50,7 +50,7 @@ export class IntensityBand<DataPointT> {
   }
 
   public render(data: DataPointT[]) {
-    let markWidth = 1.05 * (this.bounds.width / data.length);
+    let markWidth = this.bounds.width / data.length;
 
     let toHex = function(val: [number, number, number]): string {
       let acc = "#";
@@ -69,7 +69,7 @@ export class IntensityBand<DataPointT> {
       .enter()
       .append('rect')
       .attr('class', this.className)
-      .attr('width', markWidth)
+      .attr('width', 1.01 * markWidth)
       .attr('height', this.bounds.height)
       .attr('x', (d: DataPointT, i: number) => {
         return this.bounds.xPos + (i * markWidth);
