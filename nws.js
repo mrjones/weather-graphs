@@ -66,17 +66,154 @@
 	var width = 500;
 	var height = 60;
 	var aspect = width / height;
+	var TemperatureChart = (function () {
+	    function TemperatureChart(bounds) {
+	        var _this = this;
+	        this.bounds = bounds;
+	        this.xScale = d3.scaleTime().range([bounds.axisSize + bounds.margin,
+	            bounds.width - bounds.margin]);
+	        this.yScale = d3.scaleLinear().range([bounds.height - bounds.axisSize - bounds.margin,
+	            bounds.margin]);
+	        this.yAxis = d3.axisLeft(this.yScale)
+	            .ticks(3);
+	        this.xAxis = d3.axisBottom(this.xScale)
+	            .ticks(d3.timeDay.every(1))
+	            .tickFormat(d3.timeFormat("%b %d"));
+	        this.lineSpec = d3.line()
+	            .x(function (d) { return _this.xScale(new Date(d.unix_seconds * 1000)); })
+	            .y(function (d) { return _this.yScale(d.temperature); });
+	    }
+	    TemperatureChart.prototype.render = function (data, element) {
+	        this.drawTemperatureChart(element, data);
+	    };
+	    TemperatureChart.prototype.toSpec = function () {
+	        return {
+	            bounds: this.bounds,
+	            line: this.lineSpec,
+	            x: this.xScale,
+	            xAxis: this.xAxis,
+	            y: this.yScale,
+	            yAxis: this.yAxis
+	        };
+	    };
+	    ;
+	    TemperatureChart.prototype.drawTemperatureChart = function (rootElt, data) {
+	        var _this = this;
+	        var xExtent = d3.extent(data, function (d) { return new Date(d.unix_seconds * 1000); });
+	        var yExtent = d3.extent(data, function (d) { return d.temperature; });
+	        // TODO(mrjones): The types don't seem to work for using xExtent here
+	        // See: extent in
+	        // https://github.com/tomwanzek/d3-v4-definitelytyped/blob/24f5308f8e3da8f2a996454d47e60b31157ebb66/src/d3-array/index.d.ts
+	        this.xScale.domain([
+	            d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }),
+	            d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); }),
+	        ]);
+	        this.yScale.domain(yExtent);
+	        var tempsLineG = rootElt.append('g')
+	            .attr('class', 'tempsLineG');
+	        this.drawTempMidnights(tempsLineG, makeMidnights(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
+	        this.drawPrecipBar(tempsLineG, data);
+	        /*
+	          var xAxisTranslate = {
+	          x: 0,
+	          y: chart.bounds.height - chart.bounds.axisSize - chart.bounds.margin
+	          };
+	          tempsLineG.append('g')
+	          .attr('class', 'axis xaxis')
+	          .attr('transform', 'translate(' + xAxisTranslate.x + ',' + xAxisTranslate.y + ')')
+	          .call(chart.xAxis);
+	        */
+	        var yAxisTranslate = {
+	            x: this.bounds.axisSize + this.bounds.margin,
+	            y: 0
+	        };
+	        tempsLineG.append('g')
+	            .attr('class', 'axis yaxis')
+	            .attr('transform', 'translate(' + yAxisTranslate.x + ',' + yAxisTranslate.y + ')')
+	            .call(this.yAxis);
+	        tempsLineG.selectAll('.axis')
+	            .attr('font-size', '5');
+	        tempsLineG.append('path')
+	            .datum(data)
+	            .attr('class', 'dataline')
+	            .attr('d', this.lineSpec);
+	        var minMaxSpecs = [
+	            { label: "max", values: selectMaxes(data, function (d) { return d.temperature; }) },
+	            { label: "min", values: selectMins(data, function (d) { return d.temperature; }) },
+	        ];
+	        minMaxSpecs.forEach(function (spec) {
+	            var maxMarkerG = tempsLineG.selectAll('.' + spec.label + 'Marker')
+	                .data(spec.values)
+	                .enter()
+	                .append('g')
+	                .attr('class', spec.label + 'Marker');
+	            maxMarkerG.append('circle')
+	                .attr('cx', function (d) { return _this.xScale(d.time); })
+	                .attr('cy', function (d) { return _this.yScale(d.value); })
+	                .attr('r', 1);
+	            maxMarkerG.append('text')
+	                .attr('x', function (d) { return _this.xScale(d.time) - 7; })
+	                .attr('y', function (d) { return _this.yScale(d.value) + 1; })
+	                .text(function (d) { return d.value; })
+	                .style('font-family', 'sans-serif')
+	                .style('font-size', 4);
+	        });
+	    };
+	    ;
+	    TemperatureChart.prototype.drawPrecipBar = function (rootElt, data) {
+	        var _this = this;
+	        var precipBarG = rootElt.append('g');
+	        var width = 1.05 * (this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin) / data.length;
+	        precipBarG.selectAll('.precipPoint')
+	            .data(data)
+	            .enter()
+	            .append('rect')
+	            .attr('class', 'precipPoint')
+	            .attr('width', width)
+	            .attr('height', 4)
+	            .attr('x', function (d) { return _this.xScale(new Date(d.unix_seconds * 1000)); })
+	            .attr('y', this.bounds.height - this.bounds.axisSize)
+	            .attr('fill', function (d) { return "#" + percentToHex(d.precipitation_chance) + percentToHex(d.precipitation_chance) + 'ff'; });
+	    };
+	    ;
+	    TemperatureChart.prototype.drawTempMidnights = function (rootElt, midnights) {
+	        var midnightG = rootElt.selectAll('.tempMidnights')
+	            .data(midnights)
+	            .enter()
+	            .append('g')
+	            .attr('class', 'tempMidnights');
+	        var cht = this;
+	        var pathForDate = function (d) {
+	            return ' M ' + cht.xScale(d) + ' 0 L ' + cht.xScale(d) + ' ' + (cht.bounds.height - cht.bounds.axisSize);
+	        };
+	        midnightG.append('path')
+	            .attr('d', function (d) { return pathForDate(d); })
+	            .style('stroke', '#CCCCCC')
+	            .style('stroke-width', 1);
+	        var xS = this.xScale;
+	        midnightG.append('text')
+	            .attr('x', function (d) { return xS(d); })
+	            .attr('y', this.bounds.height - (this.bounds.axisSize / 2))
+	            .attr('text-anchor', 'middle')
+	            .style('font-size', '4')
+	            .text(function (d) { return d3.timeFormat('%b %d')(d); });
+	    };
+	    ;
+	    return TemperatureChart;
+	}());
+	exports.TemperatureChart = TemperatureChart;
+	;
 	$(document).ready(function () {
-	    var chart = d3.select('body').append('svg');
-	    chart.attr('width', '100%')
+	    var chartElt = d3.select('body').append('svg');
+	    chartElt.attr('width', '100%')
 	        .attr('viewBox', '0 0 ' + width + ' ' + height)
 	        .attr('preserveAspectRatio', 'xMidYMid meet');
-	    resize(chart);
+	    resize(chartElt);
 	    d3.select(window)
 	        .on("resize", function () {
-	        resize(chart);
+	        resize(chartElt);
 	    });
-	    var tempChart = setupTemperatureChart({
+	    var chart = new TemperatureChart({
 	        width: width,
 	        height: height,
 	        axisSize: 20,
@@ -84,7 +221,7 @@
 	    });
 	    d3.json('/data', function (data) {
 	        console.log(JSON.stringify(data[0]));
-	        drawTemperatureChart(chart, tempChart, data);
+	        chart.render(data, chartElt);
 	    });
 	});
 	var resize = function (chartElt) {
@@ -93,38 +230,16 @@
 	    chartElt.attr("width", targetWidth);
 	    chartElt.attr("height", targetWidth / aspect);
 	};
-	var setupTemperatureChart = function (bounds) {
-	    var x = d3.scaleTime().range([bounds.axisSize + bounds.margin,
-	        bounds.width - bounds.margin]);
-	    var y = d3.scaleLinear().range([bounds.height - bounds.axisSize - bounds.margin,
-	        bounds.margin]);
-	    var yAxis = d3.axisLeft(y)
-	        .ticks(3);
-	    var xAxis = d3.axisBottom(x)
-	        .ticks(d3.timeDay.every(1))
-	        .tickFormat(d3.timeFormat("%b %d"));
-	    var line = d3.line()
-	        .x(function (d) { return x(new Date(d.unix_seconds * 1000)); })
-	        .y(function (d) { return y(d.temperature); });
-	    return {
-	        bounds: bounds,
-	        line: line,
-	        x: x,
-	        xAxis: xAxis,
-	        y: y,
-	        yAxis: yAxis
-	    };
-	};
 	var selectMaxes = function (data, valueFn) {
 	    return selectExtremes(data, valueFn, function (a, b) { return a > b; });
 	};
 	var selectMins = function (data, valueFn) {
 	    return selectExtremes(data, valueFn, function (a, b) { return a < b; });
 	};
-	var Selection = (function () {
-	    function Selection() {
+	var SelectedPoint = (function () {
+	    function SelectedPoint() {
 	    }
-	    return Selection;
+	    return SelectedPoint;
 	}());
 	;
 	var selectExtremes = function (data, valueFn, greaterThanFn) {
@@ -167,101 +282,6 @@
 	};
 	var percentToHex = function (pct) {
 	    return Math.floor(((100 - pct) / 100) * 255).toString(16);
-	};
-	var drawPrecipBar = function (rootElt, chart, data) {
-	    var precipBarG = rootElt.append('g');
-	    var width = 1.05 * (chart.bounds.width - chart.bounds.axisSize - 2 * chart.bounds.margin) / data.length;
-	    precipBarG.selectAll('.precipPoint')
-	        .data(data)
-	        .enter()
-	        .append('rect')
-	        .attr('class', 'precipPoint')
-	        .attr('width', width)
-	        .attr('height', 4)
-	        .attr('x', function (d) { return chart.x(new Date(d.unix_seconds * 1000)); })
-	        .attr('y', chart.bounds.height - chart.bounds.axisSize)
-	        .attr('fill', function (d) { return "#" + percentToHex(d.precipitation_chance) + percentToHex(d.precipitation_chance) + 'ff'; });
-	};
-	var drawTempMidnights = function (rootElt, chart, midnights) {
-	    var midnightG = rootElt.selectAll('.tempMidnights')
-	        .data(midnights)
-	        .enter()
-	        .append('g')
-	        .attr('class', 'tempMidnights');
-	    var pathForDate = function (d) {
-	        return ' M ' + chart.x(d) + ' 0 L ' + chart.x(d) + ' ' + (chart.bounds.height - chart.bounds.axisSize);
-	    };
-	    midnightG.append('path')
-	        .attr('d', function (d) { return pathForDate(d); })
-	        .style('stroke', '#CCCCCC')
-	        .style('stroke-width', 1);
-	    midnightG.append('text')
-	        .attr('x', function (d) { return chart.x(d); })
-	        .attr('y', chart.bounds.height - (chart.bounds.axisSize / 2))
-	        .attr('text-anchor', 'middle')
-	        .style('font-size', '4')
-	        .text(function (d) { return d3.timeFormat('%b %d')(d); });
-	};
-	var drawTemperatureChart = function (rootElt, chart, data) {
-	    var xExtent = d3.extent(data, function (d) { return new Date(d.unix_seconds * 1000); });
-	    var yExtent = d3.extent(data, function (d) { return d.temperature; });
-	    // TODO(mrjones): The types don't seem to work for using xExtent here
-	    // See: extent in
-	    // https://github.com/tomwanzek/d3-v4-definitelytyped/blob/24f5308f8e3da8f2a996454d47e60b31157ebb66/src/d3-array/index.d.ts
-	    chart.x.domain([
-	        d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }),
-	        d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); }),
-	    ]);
-	    chart.y.domain(yExtent);
-	    var tempsLineG = rootElt.append('g')
-	        .attr('class', 'tempsLineG');
-	    drawTempMidnights(tempsLineG, chart, makeMidnights(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
-	    drawPrecipBar(tempsLineG, chart, data);
-	    /*
-	    var xAxisTranslate = {
-	      x: 0,
-	      y: chart.bounds.height - chart.bounds.axisSize - chart.bounds.margin
-	    };
-	    tempsLineG.append('g')
-	              .attr('class', 'axis xaxis')
-	              .attr('transform', 'translate(' + xAxisTranslate.x + ',' + xAxisTranslate.y + ')')
-	              .call(chart.xAxis);
-	    */
-	    var yAxisTranslate = {
-	        x: chart.bounds.axisSize + chart.bounds.margin,
-	        y: 0
-	    };
-	    tempsLineG.append('g')
-	        .attr('class', 'axis yaxis')
-	        .attr('transform', 'translate(' + yAxisTranslate.x + ',' + yAxisTranslate.y + ')')
-	        .call(chart.yAxis);
-	    tempsLineG.selectAll('.axis')
-	        .attr('font-size', '5');
-	    tempsLineG.append('path')
-	        .datum(data)
-	        .attr('class', 'dataline')
-	        .attr('d', chart.line);
-	    var minMaxSpecs = [
-	        { label: "max", values: selectMaxes(data, function (d) { return d.temperature; }) },
-	        { label: "min", values: selectMins(data, function (d) { return d.temperature; }) },
-	    ];
-	    minMaxSpecs.forEach(function (spec) {
-	        var maxMarkerG = tempsLineG.selectAll('.' + spec.label + 'Marker')
-	            .data(spec.values)
-	            .enter()
-	            .append('g')
-	            .attr('class', spec.label + 'Marker');
-	        maxMarkerG.append('circle')
-	            .attr('cx', function (d) { return chart.x(d.time); })
-	            .attr('cy', function (d) { return chart.y(d.value); })
-	            .attr('r', 1);
-	        maxMarkerG.append('text')
-	            .attr('x', function (d) { return chart.x(d.time) - 7; })
-	            .attr('y', function (d) { return chart.y(d.value) + 1; })
-	            .text(function (d) { return d.value; })
-	            .style('font-family', 'sans-serif')
-	            .style('font-size', 4);
-	    });
 	};
 
 
