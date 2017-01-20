@@ -30,16 +30,18 @@ $(document).ready(function() {
       resize(chartElt);
     });
 
-  let chart = new TemperatureChart({
-    width: width,
-    height: height,
-    axisSize: 20,
-    margin: 1,
-  });
+  let chart = new TemperatureChart(
+    chartElt,
+    {
+      width: width,
+      height: height,
+      axisSize: 20,
+      margin: 1,
+    });
 
   d3.json('/data', function(data: DataPoint[]) {
     console.log(JSON.stringify(data[0]));
-    chart.render(data, chartElt);
+    chart.render(data);
   });
 });
 
@@ -67,7 +69,12 @@ export class TemperatureChart {
   private xAxis: Axis<Date>;
   private yAxis: Axis<number>;
 
-  constructor(bounds: ChartBounds) {
+  private rootElt: AnySvgSelection;
+  
+  private precipBar: IntensityBand<DataPoint>;
+  private cloudsBar: IntensityBand<DataPoint>;
+  
+  constructor(rootElt: AnySvgSelection, bounds: ChartBounds) {
     this.bounds = bounds;
 
     this.xScale = d3.scaleTime().range(
@@ -86,10 +93,37 @@ export class TemperatureChart {
     this.lineSpec = d3.line<DataPoint>()
       .x((d: DataPoint) => this.xScale(new Date(d.unix_seconds * 1000)))
       .y((d: DataPoint) => this.yScale(d.temperature));
-  }
 
-  public render(data: DataPoint[], element: AnySvgSelection) {
-    this.drawTemperatureChart(element, data);
+    this.rootElt = rootElt;
+    
+    this.precipBar = new IntensityBand<DataPoint>(
+      (d: DataPoint) => d.precipitation_chance,
+      intensity.blue,
+      {
+        width: this.bounds.width - this.bounds.axisSize,
+        height: 3,
+        xPos: this.bounds.axisSize,
+        yPos: this.bounds.height - this.bounds.axisSize,
+      },
+      this.rootElt,
+      "precipBar");
+
+    this.cloudsBar = new IntensityBand<DataPoint>(
+      (d: DataPoint) => d.clouds,
+      intensity.gray,
+      {
+        width: this.bounds.width - this.bounds.axisSize,
+        height: 3,
+        xPos: this.bounds.axisSize,
+        yPos: this.bounds.height - this.bounds.axisSize + 3,
+      },
+      this.rootElt,
+      "cloudsBar");
+
+}
+
+  public render(data: DataPoint[]) {
+    this.drawTemperatureChart(this.rootElt, data);
   }
 
   private drawTemperatureChart(rootElt: AnySvgSelection, data: DataPoint[]) {
@@ -114,29 +148,8 @@ export class TemperatureChart {
         d3.max(data, d => new Date(d.unix_seconds * 1000))));
 
     // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
-    let precipBar = new IntensityBand<DataPoint>(
-      (d: DataPoint) => d.precipitation_chance,
-      intensity.blue,
-      {
-        width: this.bounds.width - this.bounds.axisSize,
-        height: 3,
-        xPos: this.bounds.axisSize,
-        yPos: this.bounds.height - this.bounds.axisSize,
-      },
-      "precipBar");
-    precipBar.render(tempsLineG, data);
-
-    let cloudsBar = new IntensityBand<DataPoint>(
-      (d: DataPoint) => d.clouds,
-      intensity.gray,
-      {
-        width: this.bounds.width - this.bounds.axisSize,
-        height: 3,
-        xPos: this.bounds.axisSize,
-        yPos: this.bounds.height - this.bounds.axisSize + 3,
-      },
-      "cloudsBar");
-    cloudsBar.render(tempsLineG, data);
+    this.precipBar.render(data);
+    this.cloudsBar.render(data);
     /*
       var xAxisTranslate = {
       x: 0,

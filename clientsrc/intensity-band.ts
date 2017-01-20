@@ -30,20 +30,26 @@ export class IntensityBand<DataPointT> {
   private intensityFn: CompteIntensityFn<DataPointT>;
   private colorFn: ColorForIntensityFn;
   private bounds: BoundingBox;
+  private rootElt: Selection<BaseType, {}, HTMLElement, any>;
   private className: string;
 
+  private myG: Selection<SVGGElement, {}, HTMLElement, any>;
+  
   constructor(intensityFn: CompteIntensityFn<DataPointT>,
               colorFn: ColorForIntensityFn,
               bounds: BoundingBox,
+              rootElt: Selection<BaseType, {}, HTMLElement, any>,
               className: string) {
     this.intensityFn = intensityFn;
     this.colorFn = colorFn;
     this.bounds = bounds;
+    this.rootElt = rootElt;
     this.className = className;
+
+    this.myG = this.rootElt.append<SVGGElement>('g');
   }
 
-  public render(rootElt: Selection<BaseType, {}, HTMLElement, any>,
-                data: DataPointT[]) {
+  public render(data: DataPointT[]) {
     let markWidth = 1.05 * (this.bounds.width / data.length);
 
     let toHex = function(val: [number, number, number]): string {
@@ -58,11 +64,7 @@ export class IntensityBand<DataPointT> {
       return acc;
     };
 
-    // TODO(mrjones): This probably doesn't belong in render in
-    // order to make this updateable.
-    let precipBarG = rootElt.append('g');
-
-    precipBarG.selectAll('.' + this.className)
+    this.myG.selectAll('.' + this.className)
       .data(data)
       .enter()
       .append('rect')

@@ -66,7 +66,7 @@
 	        .on("resize", function () {
 	        resize(chartElt);
 	    });
-	    var chart = new TemperatureChart({
+	    var chart = new TemperatureChart(chartElt, {
 	        width: width,
 	        height: height,
 	        axisSize: 20,
@@ -74,7 +74,7 @@
 	    });
 	    d3.json('/data', function (data) {
 	        console.log(JSON.stringify(data[0]));
-	        chart.render(data, chartElt);
+	        chart.render(data);
 	    });
 	});
 	var ChartBounds = (function () {
@@ -86,7 +86,7 @@
 	var height = 60;
 	var aspect = width / height;
 	var TemperatureChart = (function () {
-	    function TemperatureChart(bounds) {
+	    function TemperatureChart(rootElt, bounds) {
 	        var _this = this;
 	        this.bounds = bounds;
 	        this.xScale = d3.scaleTime().range([bounds.axisSize + bounds.margin,
@@ -101,9 +101,22 @@
 	        this.lineSpec = d3.line()
 	            .x(function (d) { return _this.xScale(new Date(d.unix_seconds * 1000)); })
 	            .y(function (d) { return _this.yScale(d.temperature); });
+	        this.rootElt = rootElt;
+	        this.precipBar = new intensity_band_1.IntensityBand(function (d) { return d.precipitation_chance; }, intensity.blue, {
+	            width: this.bounds.width - this.bounds.axisSize,
+	            height: 3,
+	            xPos: this.bounds.axisSize,
+	            yPos: this.bounds.height - this.bounds.axisSize
+	        }, this.rootElt, "precipBar");
+	        this.cloudsBar = new intensity_band_1.IntensityBand(function (d) { return d.clouds; }, intensity.gray, {
+	            width: this.bounds.width - this.bounds.axisSize,
+	            height: 3,
+	            xPos: this.bounds.axisSize,
+	            yPos: this.bounds.height - this.bounds.axisSize + 3
+	        }, this.rootElt, "cloudsBar");
 	    }
-	    TemperatureChart.prototype.render = function (data, element) {
-	        this.drawTemperatureChart(element, data);
+	    TemperatureChart.prototype.render = function (data) {
+	        this.drawTemperatureChart(this.rootElt, data);
 	    };
 	    TemperatureChart.prototype.drawTemperatureChart = function (rootElt, data) {
 	        var _this = this;
@@ -121,20 +134,8 @@
 	            .attr('class', 'tempsLineG');
 	        this.drawTempMidnights(tempsLineG, utils.midnightsBetween(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
 	        // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
-	        var precipBar = new intensity_band_1.IntensityBand(function (d) { return d.precipitation_chance; }, intensity.blue, {
-	            width: this.bounds.width - this.bounds.axisSize,
-	            height: 3,
-	            xPos: this.bounds.axisSize,
-	            yPos: this.bounds.height - this.bounds.axisSize
-	        }, "precipBar");
-	        precipBar.render(tempsLineG, data);
-	        var cloudsBar = new intensity_band_1.IntensityBand(function (d) { return d.clouds; }, intensity.gray, {
-	            width: this.bounds.width - this.bounds.axisSize,
-	            height: 3,
-	            xPos: this.bounds.axisSize,
-	            yPos: this.bounds.height - this.bounds.axisSize + 3
-	        }, "cloudsBar");
-	        cloudsBar.render(tempsLineG, data);
+	        this.precipBar.render(data);
+	        this.cloudsBar.render(data);
 	        /*
 	          var xAxisTranslate = {
 	          x: 0,
@@ -26922,13 +26923,15 @@
 	    ];
 	};
 	var IntensityBand = (function () {
-	    function IntensityBand(intensityFn, colorFn, bounds, className) {
+	    function IntensityBand(intensityFn, colorFn, bounds, rootElt, className) {
 	        this.intensityFn = intensityFn;
 	        this.colorFn = colorFn;
 	        this.bounds = bounds;
+	        this.rootElt = rootElt;
 	        this.className = className;
+	        this.myG = this.rootElt.append('g');
 	    }
-	    IntensityBand.prototype.render = function (rootElt, data) {
+	    IntensityBand.prototype.render = function (data) {
 	        var _this = this;
 	        var markWidth = 1.05 * (this.bounds.width / data.length);
 	        var toHex = function (val) {
@@ -26942,10 +26945,7 @@
 	            });
 	            return acc;
 	        };
-	        // TODO(mrjones): This probably doesn't belong in render in
-	        // order to make this updateable.
-	        var precipBarG = rootElt.append('g');
-	        precipBarG.selectAll('.' + this.className)
+	        this.myG.selectAll('.' + this.className)
 	            .data(data)
 	            .enter()
 	            .append('rect')
