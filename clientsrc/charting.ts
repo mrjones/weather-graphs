@@ -5,6 +5,8 @@ import { BaseType, Selection } from 'd3-selection';
 import { Line } from 'd3-shape';
 import * as $ from 'jquery';
 
+
+
 class DataPoint {
   public unix_seconds: number;
   public temperature: number;
@@ -17,15 +19,6 @@ class ChartBounds {
     public axisSize: number;
     public margin: number;
 }
-
-class TemperatureChartSpec {
-  public bounds: ChartBounds;
-  public line: Line<DataPoint>;
-  public x: ScaleTime<number, number>;
-  public y: ScaleLinear<number, number>;
-  public xAxis: Axis<Date>;
-  public yAxis: Axis<number>;
-};
 
 let width: number = 500;
 let height: number = 60;
@@ -64,17 +57,6 @@ export class TemperatureChart {
   public render(data: DataPoint[], element: AnySvgSelection) {
     this.drawTemperatureChart(element, data);
   }
-
-  private toSpec(): TemperatureChartSpec {
-    return {
-      bounds: this.bounds,
-      line: this.lineSpec,
-      x: this.xScale,
-      xAxis: this.xAxis,
-      y: this.yScale,
-      yAxis: this.yAxis,
-    };
-  };
 
   private drawTemperatureChart(rootElt: AnySvgSelection, data: DataPoint[]) {
     let xExtent = d3.extent(data, d => new Date(d.unix_seconds * 1000));

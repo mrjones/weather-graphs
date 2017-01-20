@@ -57,12 +57,6 @@
 	    }
 	    return ChartBounds;
 	}());
-	var TemperatureChartSpec = (function () {
-	    function TemperatureChartSpec() {
-	    }
-	    return TemperatureChartSpec;
-	}());
-	;
 	var width = 500;
 	var height = 60;
 	var aspect = width / height;
@@ -86,17 +80,6 @@
 	    TemperatureChart.prototype.render = function (data, element) {
 	        this.drawTemperatureChart(element, data);
 	    };
-	    TemperatureChart.prototype.toSpec = function () {
-	        return {
-	            bounds: this.bounds,
-	            line: this.lineSpec,
-	            x: this.xScale,
-	            xAxis: this.xAxis,
-	            y: this.yScale,
-	            yAxis: this.yAxis
-	        };
-	    };
-	    ;
 	    TemperatureChart.prototype.drawTemperatureChart = function (rootElt, data) {
 	        var _this = this;
 	        var xExtent = d3.extent(data, function (d) { return new Date(d.unix_seconds * 1000); });
