@@ -45,6 +45,8 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
+	var intensity_band_1 = __webpack_require__(4);
+	var intensity = __webpack_require__(4);
 	var utils = __webpack_require__(3);
 	var d3 = __webpack_require__(1);
 	var $ = __webpack_require__(2);
@@ -118,7 +120,15 @@
 	        var tempsLineG = rootElt.append('g')
 	            .attr('class', 'tempsLineG');
 	        this.drawTempMidnights(tempsLineG, utils.midnightsBetween(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
-	        this.drawPrecipBar(tempsLineG, data);
+	        //    this.drawPrecipBar(tempsLineG, data);
+	        // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
+	        var precipBar = new intensity_band_1.IntensityBand(function (d) { return d.precipitation_chance; }, intensity.blue, {
+	            width: this.bounds.width - this.bounds.axisSize,
+	            height: 4,
+	            xPos: this.bounds.axisSize,
+	            yPos: this.bounds.height - this.bounds.axisSize
+	        });
+	        precipBar.render(tempsLineG, data);
 	        /*
 	          var xAxisTranslate = {
 	          x: 0,
@@ -26897,6 +26907,62 @@
 	    }
 	    return maxes;
 	};
+
+
+/***/ },
+/* 4 */
+/***/ function(module, exports) {
+
+	"use strict";
+	var BoundingBox = (function () {
+	    function BoundingBox() {
+	    }
+	    return BoundingBox;
+	}());
+	exports.BoundingBox = BoundingBox;
+	exports.blue = function (intensity) {
+	    return [
+	        255 * ((100 - intensity) / 100),
+	        255 * ((100 - intensity) / 100),
+	        255,
+	    ];
+	};
+	var IntensityBand = (function () {
+	    function IntensityBand(intensityFn, colorFn, bounds) {
+	        this.intensityFn = intensityFn;
+	        this.colorFn = colorFn;
+	        this.bounds = bounds;
+	    }
+	    IntensityBand.prototype.render = function (rootElt, data) {
+	        var _this = this;
+	        var precipBarG = rootElt.append('g');
+	        var markWidth = 1.05 * (this.bounds.width / data.length);
+	        var toHex = function (val) {
+	            var acc = "#";
+	            val.forEach(function (v) {
+	                var hex = Math.floor(v).toString(16);
+	                if (hex.length === 1) {
+	                    hex = "0" + hex;
+	                }
+	                acc = acc + hex;
+	            });
+	            return acc;
+	        };
+	        precipBarG.selectAll('.precipPoint')
+	            .data(data)
+	            .enter()
+	            .append('rect')
+	            .attr('width', markWidth)
+	            .attr('height', this.bounds.height)
+	            .attr('x', function (d, i) {
+	            return _this.bounds.xPos + (i * markWidth);
+	        })
+	            .attr('y', this.bounds.yPos)
+	            .attr('fill', function (d) { return toHex(_this.colorFn(_this.intensityFn(d))); });
+	    };
+	    return IntensityBand;
+	}());
+	exports.IntensityBand = IntensityBand;
 
 
 /***/ }

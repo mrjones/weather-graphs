@@ -1,3 +1,6 @@
+import { IntensityBand } from './intensity-band';
+import * as intensity from './intensity-band';
+
 import { DataPoint } from './model';
 import * as utils from './utils';
 import * as d3 from 'd3';
@@ -40,8 +43,8 @@ $(document).ready(function() {
   });
 });
 
-type AnySvgSelection = SvgSelection<BaseType>;
 type SvgSelection<T extends BaseType> = Selection<T, {}, HTMLElement, any>;
+type AnySvgSelection = SvgSelection<BaseType>;
 type SvgSvgSelection = SvgSelection<SVGSVGElement>;
 
 class ChartBounds {
@@ -110,7 +113,18 @@ export class TemperatureChart {
         d3.min(data, d => new Date(d.unix_seconds * 1000)),
         d3.max(data, d => new Date(d.unix_seconds * 1000))));
 
-    this.drawPrecipBar(tempsLineG, data);
+    //    this.drawPrecipBar(tempsLineG, data);
+    // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
+    let precipBar = new IntensityBand<DataPoint>(
+      (d: DataPoint) => d.precipitation_chance,
+      intensity.blue,
+      {
+        width: this.bounds.width - this.bounds.axisSize,
+        height: 4,
+        xPos: this.bounds.axisSize,
+        yPos: this.bounds.height - this.bounds.axisSize,
+      });
+    precipBar.render(tempsLineG, data);
 
     /*
       var xAxisTranslate = {
