@@ -70,10 +70,10 @@ export class TemperatureChart {
   private yAxis: Axis<number>;
 
   private rootElt: AnySvgSelection;
-  
+
   private precipBar: IntensityBand<DataPoint>;
   private cloudsBar: IntensityBand<DataPoint>;
-  
+
   constructor(rootElt: AnySvgSelection, bounds: ChartBounds) {
     this.bounds = bounds;
 
@@ -89,13 +89,13 @@ export class TemperatureChart {
     this.xAxis = d3.axisBottom<Date>(this.xScale)
       .ticks(d3.timeDay.every(1))
       .tickFormat(d3.timeFormat("%b %d"));
-    
+
     this.lineSpec = d3.line<DataPoint>()
       .x((d: DataPoint) => this.xScale(new Date(d.unix_seconds * 1000)))
       .y((d: DataPoint) => this.yScale(d.temperature));
 
     this.rootElt = rootElt;
-    
+
     this.precipBar = new IntensityBand<DataPoint>(
       (d: DataPoint) => d.precipitation_chance,
       intensity.blue,
@@ -137,10 +137,10 @@ export class TemperatureChart {
       d3.max(data, d => new Date(d.unix_seconds * 1000)),
     ]);
     this.yScale.domain(yExtent);
-   
+
     let tempsLineG = rootElt.append('g')
       .attr('class', 'tempsLineG');
-   
+
     this.drawTempMidnights(
       tempsLineG,
       utils.midnightsBetween(
