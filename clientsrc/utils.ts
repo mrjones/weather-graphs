@@ -6,7 +6,7 @@ export let scale = function(d: number, dMin: number, dMax: number, rangeMin: num
 
 export let midnightsBetween = function(startTime: Date, endTime: Date): Date[] {
   let results: Date[] = [];
-  let t = startTime;
+  let t = new Date(startTime);
   while (true) {
     t.setHours(24, 0, 0, 0);
     if (t > endTime) {
@@ -58,4 +58,3 @@ let selectExtremes = function(data: DataPoint[], valueFn: (DataPoint) => number,
 
   return maxes;
 };
-

@@ -11,6 +11,10 @@ import { Line } from 'd3-shape';
 import * as $ from 'jquery';
 
 $(document).ready(function() {
+  let logicalWidth: number = 500;
+  let logicalHeight: number = 100;
+  let aspect = logicalWidth / logicalHeight;
+
   let resize = function(chartElt: SvgSelection<SVGSVGElement>): void {
     console.log(chartElt.node().getBoundingClientRect());
     let targetWidth: number = chartElt.node().getBoundingClientRect().width;
@@ -21,22 +25,24 @@ $(document).ready(function() {
   let chartElt =
     d3.select('body').append<SVGSVGElement>('svg');
   chartElt.attr('width', '100%')
-       .attr('viewBox', '0 0 ' + width + ' ' + height)
+       .attr('viewBox', '0 0 ' + logicalWidth + ' ' + logicalHeight)
        .attr('preserveAspectRatio', 'xMidYMid meet');
   resize(chartElt);
 
+  /*
   d3.select(window)
     .on("resize", function() {
       resize(chartElt);
     });
+  */
 
   let chart = new TemperatureChart(
     chartElt,
     {
-      width: width,
-      height: height,
+      width: logicalWidth,
+      height: logicalHeight,
       axisSize: 20,
-      margin: 1,
+      margin: 2,
     });
 
   d3.json('/data', function(data: DataPoint[]) {
@@ -55,10 +61,6 @@ class ChartBounds {
     public axisSize: number;
     public margin: number;
 }
-
-let width: number = 500;
-let height: number = 60;
-let aspect: number = width / height;
 
 export class TemperatureChart {
   private bounds: ChartBounds;
@@ -100,10 +102,10 @@ export class TemperatureChart {
       (d: DataPoint) => d.precipitation_chance,
       intensity.blue,
       {
-        width: this.bounds.width - this.bounds.axisSize,
+        width: this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin,
         height: 3,
-        xPos: this.bounds.axisSize,
-        yPos: this.bounds.height - this.bounds.axisSize,
+        xPos: this.bounds.axisSize + this.bounds.margin,
+        yPos: this.bounds.height - this.bounds.axisSize - this.bounds.margin,
       },
       this.rootElt,
       "precipBar");
@@ -112,10 +114,10 @@ export class TemperatureChart {
       (d: DataPoint) => d.clouds,
       intensity.gray,
       {
-        width: this.bounds.width - this.bounds.axisSize,
+        width: this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin,
         height: 3,
-        xPos: this.bounds.axisSize,
-        yPos: this.bounds.height - this.bounds.axisSize + 3,
+        xPos: this.bounds.axisSize + this.bounds.margin,
+        yPos: this.bounds.height - this.bounds.axisSize - this.bounds.margin + 3,
       },
       this.rootElt,
       "cloudsBar");
@@ -127,11 +129,11 @@ export class TemperatureChart {
   }
 
   private drawTemperatureChart(rootElt: AnySvgSelection, data: DataPoint[]) {
-    let xExtent = d3.extent(data, d => new Date(d.unix_seconds * 1000));
     let yExtent = d3.extent(data, d => d.temperature);
     // TODO(mrjones): The types don't seem to work for using xExtent here
     // See: extent in
     // https://github.com/tomwanzek/d3-v4-definitelytyped/blob/24f5308f8e3da8f2a996454d47e60b31157ebb66/src/d3-array/index.d.ts
+//    let xExtent = d3.extent(data, d => new Date(d.unix_seconds * 1000));
     this.xScale.domain([
       d3.min(data, d => new Date(d.unix_seconds * 1000)),
       d3.max(data, d => new Date(d.unix_seconds * 1000)),
@@ -141,11 +143,14 @@ export class TemperatureChart {
     let tempsLineG = rootElt.append('g')
       .attr('class', 'tempsLineG');
 
+    let startDate = d3.min(data, d => new Date(d.unix_seconds * 1000));
+    let endDate = d3.max(data, d => new Date(d.unix_seconds * 1000));
+
+    this.drawWeekendBackgrounds(tempsLineG, startDate, endDate);
+
     this.drawTempMidnights(
       tempsLineG,
-      utils.midnightsBetween(
-        d3.min(data, d => new Date(d.unix_seconds * 1000)),
-        d3.max(data, d => new Date(d.unix_seconds * 1000))));
+      utils.midnightsBetween(startDate, endDate));
 
     // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
     this.precipBar.render(data);
@@ -202,6 +207,29 @@ export class TemperatureChart {
     });
   };
 
+  private drawWeekendBackgrounds(rootElt: AnySvgSelection, startDate: Date, endDate: Date) {
+    let midnights = utils.midnightsBetween(startDate, endDate);
+
+    let dayRanges = [];
+    let lastEdge = startDate;
+    midnights.forEach(m => {
+      dayRanges.push({start: new Date(lastEdge), end: new Date(m)});
+      lastEdge = new Date(m);
+    });
+    dayRanges.push({start: lastEdge, end: endDate});
+
+    rootElt.selectAll('.dayBackground')
+      .data(dayRanges)
+      .enter()
+      .append('rect')
+      .attr('class', 'dayBackground')
+      .attr('x', range => this.xScale(range.start))
+      .attr('y', this.bounds.margin)
+      .attr('width', range => this.xScale(range.end) - this.xScale(range.start))
+      .attr('height', this.bounds.height - this.bounds.axisSize - 2 * this.bounds.margin)
+      .attr('fill', range => (range.start.getDay() === 0 || range.start.getDay() === 6) ? "#EFEFEF" : "#FFFFFF";
+  }
+
   private drawTempMidnights(rootElt: AnySvgSelection, midnights: Date[]) {
     let midnightG = rootElt.selectAll('.tempMidnights')
       .data(midnights)
@@ -211,7 +239,7 @@ export class TemperatureChart {
 
     let cht = this;
     let pathForDate = function(d: Date) {
-      return ' M ' + cht.xScale(d) + ' 0 L ' + cht.xScale(d) + ' ' + (cht.bounds.height - cht.bounds.axisSize);
+      return ' M ' + cht.xScale(d) + ' ' + cht.bounds.margin + ' L ' + cht.xScale(d) + ' ' + (cht.bounds.height - cht.bounds.axisSize - cht.bounds.margin);
     };
 
     midnightG.append('path')

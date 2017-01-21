@@ -45,12 +45,15 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
-	var intensity_band_1 = __webpack_require__(4);
-	var intensity = __webpack_require__(4);
-	var utils = __webpack_require__(3);
-	var d3 = __webpack_require__(1);
-	var $ = __webpack_require__(2);
+	var intensity_band_1 = __webpack_require__(1);
+	var intensity = __webpack_require__(1);
+	var utils = __webpack_require__(2);
+	var d3 = __webpack_require__(3);
+	var $ = __webpack_require__(4);
 	$(document).ready(function () {
+	    var logicalWidth = 500;
+	    var logicalHeight = 100;
+	    var aspect = logicalWidth / logicalHeight;
 	    var resize = function (chartElt) {
 	        console.log(chartElt.node().getBoundingClientRect());
 	        var targetWidth = chartElt.node().getBoundingClientRect().width;
@@ -59,18 +62,20 @@
 	    };
 	    var chartElt = d3.select('body').append('svg');
 	    chartElt.attr('width', '100%')
-	        .attr('viewBox', '0 0 ' + width + ' ' + height)
+	        .attr('viewBox', '0 0 ' + logicalWidth + ' ' + logicalHeight)
 	        .attr('preserveAspectRatio', 'xMidYMid meet');
 	    resize(chartElt);
+	    /*
 	    d3.select(window)
-	        .on("resize", function () {
+	      .on("resize", function() {
 	        resize(chartElt);
-	    });
+	      });
+	    */
 	    var chart = new TemperatureChart(chartElt, {
-	        width: width,
-	        height: height,
+	        width: logicalWidth,
+	        height: logicalHeight,
 	        axisSize: 20,
-	        margin: 1
+	        margin: 2
 	    });
 	    d3.json('/data', function (data) {
 	        console.log(JSON.stringify(data[0]));
@@ -82,9 +87,6 @@
 	    }
 	    return ChartBounds;
 	}());
-	var width = 500;
-	var height = 60;
-	var aspect = width / height;
 	var TemperatureChart = (function () {
 	    function TemperatureChart(rootElt, bounds) {
 	        var _this = this;
@@ -103,16 +105,16 @@
 	            .y(function (d) { return _this.yScale(d.temperature); });
 	        this.rootElt = rootElt;
 	        this.precipBar = new intensity_band_1.IntensityBand(function (d) { return d.precipitation_chance; }, intensity.blue, {
-	            width: this.bounds.width - this.bounds.axisSize,
+	            width: this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin,
 	            height: 3,
-	            xPos: this.bounds.axisSize,
-	            yPos: this.bounds.height - this.bounds.axisSize
+	            xPos: this.bounds.axisSize + this.bounds.margin,
+	            yPos: this.bounds.height - this.bounds.axisSize - this.bounds.margin
 	        }, this.rootElt, "precipBar");
 	        this.cloudsBar = new intensity_band_1.IntensityBand(function (d) { return d.clouds; }, intensity.gray, {
-	            width: this.bounds.width - this.bounds.axisSize,
+	            width: this.bounds.width - this.bounds.axisSize - 2 * this.bounds.margin,
 	            height: 3,
-	            xPos: this.bounds.axisSize,
-	            yPos: this.bounds.height - this.bounds.axisSize + 3
+	            xPos: this.bounds.axisSize + this.bounds.margin,
+	            yPos: this.bounds.height - this.bounds.axisSize - this.bounds.margin + 3
 	        }, this.rootElt, "cloudsBar");
 	    }
 	    TemperatureChart.prototype.render = function (data) {
@@ -120,11 +122,11 @@
 	    };
 	    TemperatureChart.prototype.drawTemperatureChart = function (rootElt, data) {
 	        var _this = this;
-	        var xExtent = d3.extent(data, function (d) { return new Date(d.unix_seconds * 1000); });
 	        var yExtent = d3.extent(data, function (d) { return d.temperature; });
 	        // TODO(mrjones): The types don't seem to work for using xExtent here
 	        // See: extent in
 	        // https://github.com/tomwanzek/d3-v4-definitelytyped/blob/24f5308f8e3da8f2a996454d47e60b31157ebb66/src/d3-array/index.d.ts
+	        //    let xExtent = d3.extent(data, d => new Date(d.unix_seconds * 1000));
 	        this.xScale.domain([
 	            d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }),
 	            d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); }),
@@ -132,7 +134,10 @@
 	        this.yScale.domain(yExtent);
 	        var tempsLineG = rootElt.append('g')
 	            .attr('class', 'tempsLineG');
-	        this.drawTempMidnights(tempsLineG, utils.midnightsBetween(d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); }), d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); })));
+	        var startDate = d3.min(data, function (d) { return new Date(d.unix_seconds * 1000); });
+	        var endDate = d3.max(data, function (d) { return new Date(d.unix_seconds * 1000); });
+	        this.drawWeekendBackgrounds(tempsLineG, startDate, endDate);
+	        this.drawTempMidnights(tempsLineG, utils.midnightsBetween(startDate, endDate));
 	        // TODO(mrjones): Morally, should this share an x-scaler with the temp chart?
 	        this.precipBar.render(data);
 	        this.cloudsBar.render(data);
@@ -183,6 +188,27 @@
 	        });
 	    };
 	    ;
+	    TemperatureChart.prototype.drawWeekendBackgrounds = function (rootElt, startDate, endDate) {
+	        var _this = this;
+	        var midnights = utils.midnightsBetween(startDate, endDate);
+	        var dayRanges = [];
+	        var lastEdge = startDate;
+	        midnights.forEach(function (m) {
+	            dayRanges.push({ start: new Date(lastEdge), end: new Date(m) });
+	            lastEdge = new Date(m);
+	        });
+	        dayRanges.push({ start: lastEdge, end: endDate });
+	        rootElt.selectAll('.dayBackground')
+	            .data(dayRanges)
+	            .enter()
+	            .append('rect')
+	            .attr('class', 'dayBackground')
+	            .attr('x', function (range) { return _this.xScale(range.start); })
+	            .attr('y', this.bounds.margin)
+	            .attr('width', function (range) { return _this.xScale(range.end) - _this.xScale(range.start); })
+	            .attr('height', this.bounds.height - this.bounds.axisSize - 2 * this.bounds.margin)
+	            .attr('fill', function (range) { return (range.start.getDay() === 0 || range.start.getDay() === 6) ? "#EFEFEF" : "#FFFFFF"; });
+	    };
 	    TemperatureChart.prototype.drawTempMidnights = function (rootElt, midnights) {
 	        var midnightG = rootElt.selectAll('.tempMidnights')
 	            .data(midnights)
@@ -191,7 +217,7 @@
 	            .attr('class', 'tempMidnights');
 	        var cht = this;
 	        var pathForDate = function (d) {
-	            return ' M ' + cht.xScale(d) + ' 0 L ' + cht.xScale(d) + ' ' + (cht.bounds.height - cht.bounds.axisSize);
+	            return ' M ' + cht.xScale(d) + ' ' + cht.bounds.margin + ' L ' + cht.xScale(d) + ' ' + (cht.bounds.height - cht.bounds.axisSize - cht.bounds.margin);
 	        };
 	        midnightG.append('path')
 	            .attr('d', function (d) { return pathForDate(d); })
@@ -214,6 +240,132 @@
 
 /***/ },
 /* 1 */
+/***/ function(module, exports) {
+
+	"use strict";
+	var BoundingBox = (function () {
+	    function BoundingBox() {
+	    }
+	    return BoundingBox;
+	}());
+	exports.BoundingBox = BoundingBox;
+	exports.blue = function (intensity) {
+	    return [
+	        255 * ((100 - intensity) / 100),
+	        255 * ((100 - intensity) / 100),
+	        255,
+	    ];
+	};
+	exports.gray = function (intensity) {
+	    return [
+	        255 * ((100 - intensity) / 100),
+	        255 * ((100 - intensity) / 100),
+	        255 * ((100 - intensity) / 100),
+	    ];
+	};
+	var IntensityBand = (function () {
+	    function IntensityBand(intensityFn, colorFn, bounds, rootElt, className) {
+	        this.intensityFn = intensityFn;
+	        this.colorFn = colorFn;
+	        this.bounds = bounds;
+	        this.rootElt = rootElt;
+	        this.className = className;
+	        this.myG = this.rootElt.append('g');
+	    }
+	    IntensityBand.prototype.render = function (data) {
+	        var _this = this;
+	        var markWidth = this.bounds.width / data.length;
+	        var toHex = function (val) {
+	            var acc = "#";
+	            val.forEach(function (v) {
+	                var hex = Math.floor(v).toString(16);
+	                if (hex.length === 1) {
+	                    hex = "0" + hex;
+	                }
+	                acc = acc + hex;
+	            });
+	            return acc;
+	        };
+	        this.myG.selectAll('.' + this.className)
+	            .data(data)
+	            .enter()
+	            .append('rect')
+	            .attr('class', this.className)
+	            .attr('width', 1.01 * markWidth)
+	            .attr('height', this.bounds.height)
+	            .attr('x', function (d, i) {
+	            return _this.bounds.xPos + (i * markWidth);
+	        })
+	            .attr('y', this.bounds.yPos)
+	            .attr('fill', function (d) { return toHex(_this.colorFn(_this.intensityFn(d))); });
+	    };
+	    return IntensityBand;
+	}());
+	exports.IntensityBand = IntensityBand;
+
+
+/***/ },
+/* 2 */
+/***/ function(module, exports) {
+
+	"use strict";
+	exports.scale = function (d, dMin, dMax, rangeMin, rangeMax) {
+	    return rangeMin + (rangeMax - rangeMin) * ((d - dMin) / (dMax - dMin));
+	};
+	exports.midnightsBetween = function (startTime, endTime) {
+	    var results = [];
+	    var t = new Date(startTime);
+	    while (true) {
+	        t.setHours(24, 0, 0, 0);
+	        if (t > endTime) {
+	            break;
+	        }
+	        results.push(new Date(t));
+	    }
+	    console.log("midnights(" + startTime + "," + endTime + ") => " + results);
+	    return results;
+	};
+	exports.selectMaxes = function (data, valueFn) {
+	    return selectExtremes(data, valueFn, function (a, b) { return a > b; });
+	};
+	exports.selectMins = function (data, valueFn) {
+	    return selectExtremes(data, valueFn, function (a, b) { return a < b; });
+	};
+	var SelectedPoint = (function () {
+	    function SelectedPoint() {
+	    }
+	    return SelectedPoint;
+	}());
+	;
+	var selectExtremes = function (data, valueFn, greaterThanFn) {
+	    var maxes = [];
+	    var risingOrFlat = false;
+	    var lastIncrease = -1;
+	    for (var i = 1; i < data.length; i++) {
+	        if (greaterThanFn(valueFn(data[i]), valueFn(data[i - 1]))) {
+	            lastIncrease = i;
+	        }
+	        if ((!greaterThanFn(valueFn(data[i]), valueFn(data[i - 1])) &&
+	            valueFn(data[i]) !== valueFn(data[i - 1]))
+	            || (i === data.length - 1)) {
+	            if (risingOrFlat && lastIncrease >= 0) {
+	                risingOrFlat = false;
+	                maxes.push({
+	                    value: valueFn(data[lastIncrease]),
+	                    time: new Date(data[lastIncrease].unix_seconds * 1000)
+	                });
+	            }
+	        }
+	        else {
+	            risingOrFlat = true;
+	        }
+	    }
+	    return maxes;
+	};
+
+
+/***/ },
+/* 3 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// https://d3js.org Version 4.4.2. Copyright 2017 Mike Bostock.
@@ -16612,7 +16764,7 @@
 
 
 /***/ },
-/* 2 */
+/* 4 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
@@ -26835,132 +26987,6 @@
 
 	return jQuery;
 	} );
-
-
-/***/ },
-/* 3 */
-/***/ function(module, exports) {
-
-	"use strict";
-	exports.scale = function (d, dMin, dMax, rangeMin, rangeMax) {
-	    return rangeMin + (rangeMax - rangeMin) * ((d - dMin) / (dMax - dMin));
-	};
-	exports.midnightsBetween = function (startTime, endTime) {
-	    var results = [];
-	    var t = startTime;
-	    while (true) {
-	        t.setHours(24, 0, 0, 0);
-	        if (t > endTime) {
-	            break;
-	        }
-	        results.push(new Date(t));
-	    }
-	    console.log("midnights(" + startTime + "," + endTime + ") => " + results);
-	    return results;
-	};
-	exports.selectMaxes = function (data, valueFn) {
-	    return selectExtremes(data, valueFn, function (a, b) { return a > b; });
-	};
-	exports.selectMins = function (data, valueFn) {
-	    return selectExtremes(data, valueFn, function (a, b) { return a < b; });
-	};
-	var SelectedPoint = (function () {
-	    function SelectedPoint() {
-	    }
-	    return SelectedPoint;
-	}());
-	;
-	var selectExtremes = function (data, valueFn, greaterThanFn) {
-	    var maxes = [];
-	    var risingOrFlat = false;
-	    var lastIncrease = -1;
-	    for (var i = 1; i < data.length; i++) {
-	        if (greaterThanFn(valueFn(data[i]), valueFn(data[i - 1]))) {
-	            lastIncrease = i;
-	        }
-	        if ((!greaterThanFn(valueFn(data[i]), valueFn(data[i - 1])) &&
-	            valueFn(data[i]) !== valueFn(data[i - 1]))
-	            || (i === data.length - 1)) {
-	            if (risingOrFlat && lastIncrease >= 0) {
-	                risingOrFlat = false;
-	                maxes.push({
-	                    value: valueFn(data[lastIncrease]),
-	                    time: new Date(data[lastIncrease].unix_seconds * 1000)
-	                });
-	            }
-	        }
-	        else {
-	            risingOrFlat = true;
-	        }
-	    }
-	    return maxes;
-	};
-
-
-/***/ },
-/* 4 */
-/***/ function(module, exports) {
-
-	"use strict";
-	var BoundingBox = (function () {
-	    function BoundingBox() {
-	    }
-	    return BoundingBox;
-	}());
-	exports.BoundingBox = BoundingBox;
-	exports.blue = function (intensity) {
-	    return [
-	        255 * ((100 - intensity) / 100),
-	        255 * ((100 - intensity) / 100),
-	        255,
-	    ];
-	};
-	exports.gray = function (intensity) {
-	    return [
-	        255 * ((100 - intensity) / 100),
-	        255 * ((100 - intensity) / 100),
-	        255 * ((100 - intensity) / 100),
-	    ];
-	};
-	var IntensityBand = (function () {
-	    function IntensityBand(intensityFn, colorFn, bounds, rootElt, className) {
-	        this.intensityFn = intensityFn;
-	        this.colorFn = colorFn;
-	        this.bounds = bounds;
-	        this.rootElt = rootElt;
-	        this.className = className;
-	        this.myG = this.rootElt.append('g');
-	    }
-	    IntensityBand.prototype.render = function (data) {
-	        var _this = this;
-	        var markWidth = this.bounds.width / data.length;
-	        var toHex = function (val) {
-	            var acc = "#";
-	            val.forEach(function (v) {
-	                var hex = Math.floor(v).toString(16);
-	                if (hex.length === 1) {
-	                    hex = "0" + hex;
-	                }
-	                acc = acc + hex;
-	            });
-	            return acc;
-	        };
-	        this.myG.selectAll('.' + this.className)
-	            .data(data)
-	            .enter()
-	            .append('rect')
-	            .attr('class', this.className)
-	            .attr('width', 1.01 * markWidth)
-	            .attr('height', this.bounds.height)
-	            .attr('x', function (d, i) {
-	            return _this.bounds.xPos + (i * markWidth);
-	        })
-	            .attr('y', this.bounds.yPos)
-	            .attr('fill', function (d) { return toHex(_this.colorFn(_this.intensityFn(d))); });
-	    };
-	    return IntensityBand;
-	}());
-	exports.IntensityBand = IntensityBand;
 
 
 /***/ }
