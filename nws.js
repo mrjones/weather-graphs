@@ -229,7 +229,7 @@
 	            .attr('y', this.bounds.height - (this.bounds.axisSize / 2))
 	            .attr('text-anchor', 'middle')
 	            .style('font-size', '4')
-	            .text(function (d) { return d3.timeFormat('%b %d')(d); });
+	            .text(function (d) { return d3.timeFormat('%a %b %d')(d); });
 	    };
 	    ;
 	    return TemperatureChart;

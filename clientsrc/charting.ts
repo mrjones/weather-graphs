@@ -253,6 +253,6 @@ export class TemperatureChart {
       .attr('y', this.bounds.height - (this.bounds.axisSize / 2))
       .attr('text-anchor', 'middle')
       .style('font-size', '4')
-      .text(d => d3.timeFormat('%b %d')(d));
+      .text(d => d3.timeFormat('%a %b %d')(d));
   };
 };

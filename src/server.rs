@@ -4,9 +4,7 @@ extern crate rustc_serialize;
 extern crate time;
 extern crate xmltree;
 
-use hyper::Client;
 use hyper::Server;
-use hyper::header::UserAgent;
 use hyper::server::Request;
 use hyper::server::Response;
 use rustc_serialize::json;
@@ -17,6 +15,8 @@ use std::io::Write;
 use std::str::FromStr;
 use time::strptime;
 use xmltree::Element;
+
+mod http;
 
 #[derive(Clone, RustcDecodable, RustcEncodable)]
 pub struct DataPoint {
@@ -61,7 +61,7 @@ fn parse_region<T: FromStr + Debug>(
             }
         }
     }
-    
+
     return res
 }
 
@@ -109,7 +109,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
             timestamps.push(tm);
         }
     }
-    
+
     let temps = parse_region::<i32>(
         &location_params,
         &|e| e.name == "temperature" &&
@@ -144,7 +144,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
     for i in 0..timestamps.len() {
         points[i].unix_seconds = timestamps[i].to_timespec().sec;
     }
-    
+
     let num_valid = vec![
         fill_in(temps, &mut points,
                 &|temp, ref mut pt| pt.temperature = *temp),
@@ -165,6 +165,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
 }
 
 fn json_data() -> String {
+    /*
     let client = Client::new();
 
     let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
@@ -172,15 +173,17 @@ fn json_data() -> String {
     let nws_reply_result = client.get(&url)
         .header(UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36".to_owned()))
         .send();
+     */
+
+    let client = http::new_client();
+    let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
+    let nws_reply_result = client.fetch(&url);
+
     match nws_reply_result {
         Err(ref e) => println!("Error: {:?}", e),
-        Ok(ref t) => println!("OK {}", t.status),
+        Ok(_) => println!("OK!"),
     }
-    let mut nws_reply = nws_reply_result.unwrap();
-
-
-    let mut body = String::new();
-    nws_reply.read_to_string(&mut body).unwrap();
+    let body = nws_reply_result.unwrap();
 
     let mut logfile = File::create("/tmp/lastresponse.txt").unwrap();
     logfile.write_all(body.as_bytes()).unwrap();
@@ -198,7 +201,7 @@ fn static_page(t: &str) -> String {
 }
 
 /*
-    
+
     let mut hb = handlebars::Handlebars::new();
     hb.register_template_file("index", &Path::new("./index.html")).ok().unwrap();
     hb.register_template_file("google", &Path::new("./google.js")).ok().unwrap();
@@ -239,7 +242,7 @@ fn hello(req: Request, res: Response) {
 
 fn main() {
     let port = 3000;
-    
+
     println!("--- Running on port {} ---", port);
     Server::http(
         std::net::SocketAddr::V4(
