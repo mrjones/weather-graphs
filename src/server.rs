@@ -165,16 +165,6 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
 }
 
 fn json_data() -> String {
-    /*
-    let client = Client::new();
-
-    let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
-
-    let nws_reply_result = client.get(&url)
-        .header(UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36".to_owned()))
-        .send();
-     */
-
     let client = http::new_client();
     let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
     let nws_reply_result = client.fetch(&url);
@@ -200,21 +190,7 @@ fn static_page(t: &str) -> String {
     return s;
 }
 
-/*
-
-    let mut hb = handlebars::Handlebars::new();
-    hb.register_template_file("index", &Path::new("./index.html")).ok().unwrap();
-    hb.register_template_file("google", &Path::new("./google.js")).ok().unwrap();
-    hb.register_template_file("d3dash_html", &Path::new("./d3dash.html")).ok().expect("d3dash.html");
-    hb.register_template_file("d3dash_js", &Path::new("./d3dash.js")).ok().expect("d3dash.js");
-    hb.register_template_file("nws_js", &Path::new("./nws.js")).expect("nws.js");
-
-    let data = {};
-    return hb.render(t, &data).expect("hb render");
-}
-*/
-
-fn hello(req: Request, res: Response) {
+fn dispatch(req: Request, res: Response) {
     println!("{}", req.uri);
     match format!("{}", req.uri).as_ref() {
         "/favicon.ico" => res.send("".as_bytes()).unwrap(),
@@ -225,19 +201,6 @@ fn hello(req: Request, res: Response) {
         "/google.js" => res.send(static_page("google.js").as_bytes()).unwrap(),
         _ => res.send(static_page("index.html").as_bytes()).unwrap(),
     }
-
-    /*
-    match format!("{}", req.uri).as_ref() {
-        "/favicon.ico" => res.send("".as_bytes()).unwrap(),
-        "/d3dash" => res.send(static_page("d3dash_html").as_bytes()).unwrap(),
-        "/d3dash.js" => res.send(static_page("d3dash_js").as_bytes()).unwrap(),
-        "/nws.js" => res.send(static_page("nws_js").as_bytes()).unwrap(),
-        "/data" => res.send(json_data().as_bytes()).unwrap(),
-        "/google.js" => res.send(static_page("google").as_bytes()).unwrap(),
-        _ => res.send(static_page("index").as_bytes()).unwrap(),
-    }
-     */
-
 }
 
 fn main() {
@@ -249,6 +212,6 @@ fn main() {
             std::net::SocketAddrV4::new(
                 std::net::Ipv4Addr::new(0, 0, 0, 0),
                 port))).unwrap()
-        .handle(hello).unwrap();
+        .handle(dispatch).unwrap();
     println!("Done.");
 }
