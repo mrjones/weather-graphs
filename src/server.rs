@@ -164,8 +164,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
     return points.into_iter().take(valid_count).collect();
 }
 
-fn json_data() -> String {
-    let client = http::new_client();
+fn json_data(client: &(http::SimpleClient)) -> String {
     let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
     let nws_reply_result = client.fetch(&url);
 
@@ -190,21 +189,37 @@ fn static_page(t: &str) -> String {
     return s;
 }
 
-fn dispatch(req: Request, res: Response) {
-    println!("{}", req.uri);
-    match format!("{}", req.uri).as_ref() {
-        "/favicon.ico" => res.send("".as_bytes()).unwrap(),
-        "/d3dash" => res.send(static_page("d3dash.html").as_bytes()).unwrap(),
-        "/d3dash.js" => res.send(static_page("d3dash.js").as_bytes()).unwrap(),
-        "/nws.js" => res.send(static_page("nws.js").as_bytes()).unwrap(),
-        "/data" => res.send(json_data().as_bytes()).unwrap(),
-        "/google.js" => res.send(static_page("google.js").as_bytes()).unwrap(),
-        _ => res.send(static_page("index.html").as_bytes()).unwrap(),
+struct WeatherServer {
+    client: Box<http::SimpleClient + std::marker::Send + std::marker::Sync>,
+}
+
+impl WeatherServer {
+    fn new() -> WeatherServer {
+        return WeatherServer{
+            client: http::new_client(),
+        };
+    }
+}
+
+impl hyper::server::Handler for WeatherServer {
+    fn handle(&self, req: Request, res: Response) {
+        println!("{}", req.uri);
+        match format!("{}", req.uri).as_ref() {
+            "/favicon.ico" => res.send("".as_bytes()).unwrap(),
+            "/d3dash" => res.send(static_page("d3dash.html").as_bytes()).unwrap(),
+            "/d3dash.js" => res.send(static_page("d3dash.js").as_bytes()).unwrap(),
+            "/nws.js" => res.send(static_page("nws.js").as_bytes()).unwrap(),
+            "/data" => res.send(json_data(self.client.as_ref()).as_bytes()).unwrap(),
+            "/google.js" => res.send(static_page("google.js").as_bytes()).unwrap(),
+            _ => res.send(static_page("index.html").as_bytes()).unwrap(),
+        }
     }
 }
 
 fn main() {
     let port = 3000;
+
+    let s = WeatherServer::new();
 
     println!("--- Running on port {} ---", port);
     Server::http(
@@ -212,6 +227,6 @@ fn main() {
             std::net::SocketAddrV4::new(
                 std::net::Ipv4Addr::new(0, 0, 0, 0),
                 port))).unwrap()
-        .handle(dispatch).unwrap();
+        .handle(s).unwrap();
     println!("Done.");
 }

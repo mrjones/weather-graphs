@@ -10,7 +10,7 @@ pub trait SimpleClient {
     fn fetch(&self, url: &str) -> std::result::Result<String, SimpleError>;
 }
 
-pub fn new_client() -> Box<SimpleClient> {
+pub fn new_client() -> Box<SimpleClient + Sync + Send> {
     return Box::new(HyperHttpClient::new());
 }
 
