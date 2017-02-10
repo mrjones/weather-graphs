@@ -3,13 +3,15 @@ extern crate std;
 
 use cache;
 
+pub type SimpleResult<T> = std::result::Result<T, SimpleError>;
+
 #[derive(Debug)]
 pub enum SimpleError {
     Uncategorized(String),
 }
 
 pub trait SimpleClient {
-    fn fetch(&self, url: &str) -> std::result::Result<String, SimpleError>;
+    fn fetch(&mut self, url: &str) -> SimpleResult<String>;
 }
 
 pub fn new_client() -> Box<SimpleClient + Sync + Send> {
@@ -55,7 +57,7 @@ impl HyperHttpClient {
 }
 
 impl SimpleClient for HyperHttpClient {
-    fn fetch(&self, url: &str) -> std::result::Result<String, SimpleError> {
+    fn fetch(&mut self, url: &str) -> SimpleResult<String> {
         use std::io::Read;
 
         let mut response = try!(self.hyper_client.get(url)
@@ -86,11 +88,16 @@ impl CachingWrapper {
 }
 
 impl SimpleClient for CachingWrapper {
-    fn fetch(&self, url: &str) -> std::result::Result<String, SimpleError> {
-        match self.client.fetch(url) {
-            Err(e) => return Err(e),
-            Ok(response) => {
-//                self.cache.insert(url, response);
+    fn fetch(&mut self, url: &str) -> SimpleResult<String> {
+        match self.cache.lookup(url) {
+            Some(data) => {
+                println!("Using cached value for '{}'", url);
+                return Ok(data);
+            },
+            None => {
+                println!("Re-fetching '{}'", url);
+                let response = self.client.fetch(url)?;
+                self.cache.insert(url, response.clone());
                 return Ok(response);
             }
         }
