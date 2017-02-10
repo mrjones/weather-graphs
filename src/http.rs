@@ -5,7 +5,7 @@ use cache;
 use result;
 
 pub trait SimpleClient {
-    fn fetch(&mut self, url: &str) -> result::SimpleResult<String>;
+    fn fetch(&self, url: &str) -> result::SimpleResult<String>;
 }
 
 pub fn new_client() -> Box<SimpleClient + Sync + Send> {
@@ -26,7 +26,7 @@ impl HyperHttpClient {
 }
 
 impl SimpleClient for HyperHttpClient {
-    fn fetch(&mut self, url: &str) -> result::SimpleResult<String> {
+    fn fetch(&self, url: &str) -> result::SimpleResult<String> {
         use std::io::Read;
 
         let mut response = try!(self.hyper_client.get(url)
@@ -57,7 +57,7 @@ impl CachingWrapper {
 }
 
 impl SimpleClient for CachingWrapper {
-    fn fetch(&mut self, url: &str) -> result::SimpleResult<String> {
+    fn fetch(&self, url: &str) -> result::SimpleResult<String> {
         match self.cache.lookup(url) {
             Some(data) => {
                 println!("Using cached value for '{}'", url);

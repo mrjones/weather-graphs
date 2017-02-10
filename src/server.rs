@@ -167,7 +167,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
     return points.into_iter().take(valid_count).collect();
 }
 
-fn json_data(latlng: &zipcoder::LatLng, client: &mut http::SimpleClient) -> String {
+fn json_data(latlng: &zipcoder::LatLng, client: &http::SimpleClient) -> String {
     //    let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
     let url = format!("http://forecast.weather.gov/MapClick.php?lat={}&lon={}&FcstType=digitalDWML", latlng.lat, latlng.lng);
     let nws_reply_result = client.fetch(&url);
@@ -207,9 +207,9 @@ impl WeatherServer {
     }
 }
 
-//impl hyper::server::Handler for WeatherServer {
-impl WeatherServer {
-    fn handle(&mut self, req: Request, res: Response) {
+impl hyper::server::Handler for WeatherServer {
+//impl WeatherServer {
+    fn handle(&self, req: Request, res: Response) {
         println!("{}", req.uri);
         match format!("{}", req.uri).as_ref() {
             "/favicon.ico" => res.send("".as_bytes()).unwrap(),
@@ -219,7 +219,7 @@ impl WeatherServer {
             "/data" => {
                 match self.zipcoder.to_latlng(10003) {
                     Ok(latlng) => {
-                        res.send(json_data(&latlng, self.client.as_mut()).as_bytes()).unwrap();
+                        res.send(json_data(&latlng, self.client.as_ref()).as_bytes()).unwrap();
                     },
                     Err(err) => res.send(format!("ERROR: {}", err).as_bytes()).unwrap(),
                 };
@@ -233,7 +233,7 @@ impl WeatherServer {
 fn main() {
     let port = 3000;
 
-    let s = std::sync::Arc::new(std::sync::Mutex::new(WeatherServer::new()));
+    let s = WeatherServer::new();
 
     println!("--- Running on port {} ---", port);
     Server::http(
@@ -241,8 +241,9 @@ fn main() {
             std::net::SocketAddrV4::new(
                 std::net::Ipv4Addr::new(0, 0, 0, 0),
                 port))).unwrap()
-        .handle(move |req: Request, resp: Response| {
-            s.lock().unwrap().handle(req, resp);
-        }).unwrap();
+        .handle(s).unwrap();
+//        .handle(move |req: Request, resp: Response| {
+//            s.lock().unwrap().handle(req, resp);
+//        }).unwrap();
     println!("Done.");
 }

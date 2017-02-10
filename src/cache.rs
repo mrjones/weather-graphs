@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 pub trait Cache<T: Send + Clone> {
     fn lookup(&self, key: &str) -> Option<T>;
-    fn insert(&mut self, key: &str, value: T);
+    fn insert(&self, key: &str, value: T);
 }
 
 
@@ -35,7 +35,7 @@ impl<T: Send + Clone> Cache<T> for InMemoryCache<T> {
         return self.data.lock().unwrap().get(key).map(|x| x.clone());
     }
 
-    fn insert(&mut self, key: &str, value: T) {
+    fn insert(&self, key: &str, value: T) {
         self.data.lock().unwrap().insert(key.to_string(), value);
     }
 }
