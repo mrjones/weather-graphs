@@ -8,8 +8,10 @@ name = "nwschart-server"
 path = "src/server.rs"
 
 [dependencies]
+futures = "*"
 handlebars = "*"
 hyper = "*"
 rustc-serialize = "*"
+tokio-core = "*"
 time = "*"
 xmltree = "*"

@@ -16,6 +16,7 @@ use std::str::FromStr;
 use time::strptime;
 use xmltree::Element;
 
+mod cache;
 mod http;
 
 #[derive(Clone, RustcDecodable, RustcEncodable)]
@@ -164,7 +165,7 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
     return points.into_iter().take(valid_count).collect();
 }
 
-fn json_data(client: &(http::SimpleClient)) -> String {
+fn json_data(client: &http::SimpleClient) -> String {
     let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
     let nws_reply_result = client.fetch(&url);
 

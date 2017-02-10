@@ -1,6 +1,8 @@
 extern crate hyper;
 extern crate std;
 
+use cache;
+
 #[derive(Debug)]
 pub enum SimpleError {
     Uncategorized(String),
@@ -11,7 +13,7 @@ pub trait SimpleClient {
 }
 
 pub fn new_client() -> Box<SimpleClient + Sync + Send> {
-    return Box::new(HyperHttpClient::new());
+    return Box::new(CachingWrapper::new(HyperHttpClient::new()));
 }
 
 impl std::fmt::Display for SimpleError {
@@ -66,5 +68,31 @@ impl SimpleClient for HyperHttpClient {
         let mut body = String::new();
         try!(response.read_to_string(&mut body));
         return Ok(body);
+    }
+}
+
+struct CachingWrapper {
+    client: Box<SimpleClient + std::marker::Send + std::marker::Sync>,
+    cache: Box<cache::Cache<String> + std::marker::Send + std::marker::Sync>,
+}
+
+impl CachingWrapper {
+    fn new<C: SimpleClient + Send + Sync + 'static>(c: C) -> CachingWrapper {
+        return CachingWrapper{
+            client: Box::new(c),
+            cache: cache::new_cache::<String>(),
+        }
+    }
+}
+
+impl SimpleClient for CachingWrapper {
+    fn fetch(&self, url: &str) -> std::result::Result<String, SimpleError> {
+        match self.client.fetch(url) {
+            Err(e) => return Err(e),
+            Ok(response) => {
+//                self.cache.insert(url, response);
+                return Ok(response);
+            }
+        }
     }
 }
