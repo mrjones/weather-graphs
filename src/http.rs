@@ -2,47 +2,16 @@ extern crate hyper;
 extern crate std;
 
 use cache;
-
-pub type SimpleResult<T> = std::result::Result<T, SimpleError>;
-
-#[derive(Debug)]
-pub enum SimpleError {
-    Uncategorized(String),
-}
+use result;
 
 pub trait SimpleClient {
-    fn fetch(&mut self, url: &str) -> SimpleResult<String>;
+    fn fetch(&mut self, url: &str) -> result::SimpleResult<String>;
 }
 
 pub fn new_client() -> Box<SimpleClient + Sync + Send> {
     return Box::new(CachingWrapper::new(HyperHttpClient::new()));
 }
 
-impl std::fmt::Display for SimpleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            SimpleError::Uncategorized(ref e) => std::fmt::Display::fmt(e, f),
-        }
-    }
-}
-
-impl std::error::Error for SimpleError {
-    fn description(&self) -> &str {
-        match *self {
-            SimpleError::Uncategorized(ref str) => str,
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        return None
-    }
-}
-
-impl From<std::io::Error> for SimpleError {
-    fn from(err: std::io::Error) -> SimpleError {
-        return SimpleError::Uncategorized(format!("{:?}", err));
-    }
-}
 
 struct HyperHttpClient {
     hyper_client: hyper::Client,
@@ -57,13 +26,13 @@ impl HyperHttpClient {
 }
 
 impl SimpleClient for HyperHttpClient {
-    fn fetch(&mut self, url: &str) -> SimpleResult<String> {
+    fn fetch(&mut self, url: &str) -> result::SimpleResult<String> {
         use std::io::Read;
 
         let mut response = try!(self.hyper_client.get(url)
                                 .header(hyper::header::UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36".to_owned()))
                                 .send()
-                                .map_err(|e| SimpleError::Uncategorized(format!("{:?}", e))));
+                                .map_err(|e| result::SimpleError::Uncategorized(format!("{:?}", e))));
 
 
 
@@ -88,7 +57,7 @@ impl CachingWrapper {
 }
 
 impl SimpleClient for CachingWrapper {
-    fn fetch(&mut self, url: &str) -> SimpleResult<String> {
+    fn fetch(&mut self, url: &str) -> result::SimpleResult<String> {
         match self.cache.lookup(url) {
             Some(data) => {
                 println!("Using cached value for '{}'", url);

@@ -18,6 +18,8 @@ use xmltree::Element;
 
 mod cache;
 mod http;
+mod result;
+mod zipcoder;
 
 #[derive(Clone, RustcDecodable, RustcEncodable)]
 pub struct DataPoint {
@@ -165,8 +167,9 @@ fn parse_xml(data: &String) -> Vec<DataPoint> {
     return points.into_iter().take(valid_count).collect();
 }
 
-fn json_data(client: &mut http::SimpleClient) -> String {
-    let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
+fn json_data(latlng: &zipcoder::LatLng, client: &mut http::SimpleClient) -> String {
+    //    let url = format!("http://forecast.weather.gov/MapClick.php?lat=40.731&lon=-73.9881&FcstType=digitalDWML");
+    let url = format!("http://forecast.weather.gov/MapClick.php?lat={}&lon={}&FcstType=digitalDWML", latlng.lat, latlng.lng);
     let nws_reply_result = client.fetch(&url);
 
     match nws_reply_result {
@@ -192,12 +195,14 @@ fn static_page(t: &str) -> String {
 
 struct WeatherServer {
     client: Box<http::SimpleClient + std::marker::Send + std::marker::Sync>,
+    zipcoder: Box<zipcoder::ZipCoder + std::marker::Send + std::marker::Sync>,
 }
 
 impl WeatherServer {
     fn new() -> WeatherServer {
         return WeatherServer{
             client: http::new_client(),
+            zipcoder: zipcoder::new_zipcoder(),
         };
     }
 }
@@ -211,7 +216,14 @@ impl WeatherServer {
             "/d3dash" => res.send(static_page("d3dash.html").as_bytes()).unwrap(),
             "/d3dash.js" => res.send(static_page("d3dash.js").as_bytes()).unwrap(),
             "/nws.js" => res.send(static_page("nws.js").as_bytes()).unwrap(),
-            "/data" => res.send(json_data(self.client.as_mut()).as_bytes()).unwrap(),
+            "/data" => {
+                match self.zipcoder.to_latlng(10003) {
+                    Ok(latlng) => {
+                        res.send(json_data(&latlng, self.client.as_mut()).as_bytes()).unwrap();
+                    },
+                    Err(err) => res.send(format!("ERROR: {}", err).as_bytes()).unwrap(),
+                };
+            },
             "/google.js" => res.send(static_page("google.js").as_bytes()).unwrap(),
             _ => res.send(static_page("index.html").as_bytes()).unwrap(),
         }
