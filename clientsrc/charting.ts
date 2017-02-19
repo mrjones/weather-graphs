@@ -227,7 +227,7 @@ export class TemperatureChart {
       .attr('y', this.bounds.margin)
       .attr('width', range => this.xScale(range.end) - this.xScale(range.start))
       .attr('height', this.bounds.height - this.bounds.axisSize - 2 * this.bounds.margin)
-      .attr('fill', range => (range.start.getDay() === 0 || range.start.getDay() === 6) ? "#EFEFEF" : "#FFFFFF";
+      .attr('fill', range => (range.start.getDay() === 0 || range.start.getDay() === 6) ? "#EFEFEF" : "#FFFFFF");
   }
 
   private drawTempMidnights(rootElt: AnySvgSelection, midnights: Date[]) {
