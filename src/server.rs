@@ -186,25 +186,28 @@ fn json_data(latlng: &zipcoder::LatLng, client: &http::SimpleClient) -> String {
     return json::encode(&points).expect("json encode");
 }
 
-fn static_page(t: &str) -> String {
-    let mut f = std::fs::File::open(t).expect(
-        format!("Opening file: {}", t).as_str());
-    let mut s = String::new();
-    f.read_to_string(&mut s).expect(format!("Reading file: {}", t).as_str());
-    return s;
-}
-
 struct WeatherServer {
     client: Box<http::SimpleClient + std::marker::Send + std::marker::Sync>,
     zipcoder: Box<zipcoder::ZipCoder + std::marker::Send + std::marker::Sync>,
+    static_dir: String,
 }
 
 impl WeatherServer {
-    fn new() -> WeatherServer {
+    fn new(static_dir: &str) -> WeatherServer {
         return WeatherServer{
             client: http::new_client(),
             zipcoder: zipcoder::new_zipcoder(),
+            static_dir: static_dir.to_string(),
         };
+    }
+
+    fn static_page(&self, relative_filename: &str) -> String {
+        let full_filename = format!("{}/{}", self.static_dir, relative_filename);
+        let mut f = std::fs::File::open(&full_filename).expect(
+            format!("Opening file: {}", &full_filename).as_str());
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect(format!("Reading file: {}", &full_filename).as_str());
+        return s;
     }
 }
 
@@ -214,9 +217,9 @@ impl hyper::server::Handler for WeatherServer {
         println!("{}", req.uri);
         match format!("{}", req.uri).as_ref() {
             "/favicon.ico" => res.send("".as_bytes()).unwrap(),
-            "/d3dash" => res.send(static_page("d3dash.html").as_bytes()).unwrap(),
-            "/d3dash.js" => res.send(static_page("d3dash.js").as_bytes()).unwrap(),
-            "/nws.js" => res.send(static_page("nws.js").as_bytes()).unwrap(),
+            "/d3dash" => res.send(self.static_page("d3dash.html").as_bytes()).unwrap(),
+            "/d3dash.js" => res.send(self.static_page("d3dash.js").as_bytes()).unwrap(),
+            "/nws.js" => res.send(self.static_page("nws.js").as_bytes()).unwrap(),
             "/data" => {
                 match self.zipcoder.to_latlng(10003) {
                     Ok(latlng) => {
@@ -225,8 +228,8 @@ impl hyper::server::Handler for WeatherServer {
                     Err(err) => res.send(format!("ERROR: {}", err).as_bytes()).unwrap(),
                 };
             },
-            "/google.js" => res.send(static_page("google.js").as_bytes()).unwrap(),
-            _ => res.send(static_page("index.html").as_bytes()).unwrap(),
+            "/google.js" => res.send(self.static_page("google.js").as_bytes()).unwrap(),
+            _ => res.send(self.static_page("index.html").as_bytes()).unwrap(),
         }
     }
 }
@@ -246,7 +249,7 @@ fn main() {
     let port = matches.opt_str("p").unwrap_or("3000".to_string())
         .parse::<u16>().expect("Couldn't parse port!");
 
-    let s = WeatherServer::new();
+    let s = WeatherServer::new(&static_dir);
 
     println!("--- Running!");
     println!("---       Port: {}", port);
