@@ -9,6 +9,7 @@ path = "src/server.rs"
 
 [dependencies]
 futures = "*"
+getopts = "*"
 handlebars = "*"
 hyper = "*"
 rustc-serialize = "*"

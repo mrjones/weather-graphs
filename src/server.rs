@@ -1,3 +1,4 @@
+extern crate getopts;
 extern crate handlebars;
 extern crate hyper;
 extern crate rustc_serialize;
@@ -231,11 +232,26 @@ impl hyper::server::Handler for WeatherServer {
 }
 
 fn main() {
-    let port = 3000;
+    let args: Vec<String> = std::env::args().collect();
+    let mut opts = getopts::Options::new();
+    opts.optopt("s", "static_dir", "Location of static files", "DIR");
+    opts.optopt("p", "port", "Port to bind to", "PORT");
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => { m },
+        Err(e) => { panic!(e.to_string()); },
+    };
+
+    let static_dir = matches.opt_str("s").unwrap_or("./".to_string());
+    let port = matches.opt_str("p").unwrap_or("3000".to_string())
+        .parse::<u16>().expect("Couldn't parse port!");
 
     let s = WeatherServer::new();
 
-    println!("--- Running on port {} ---", port);
+    println!("--- Running!");
+    println!("---       Port: {}", port);
+    println!("--- Static dir: {}", static_dir);
+    println!("---");
     Server::http(
         std::net::SocketAddr::V4(
             std::net::SocketAddrV4::new(
