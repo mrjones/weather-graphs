@@ -2,6 +2,8 @@ usage="$0 [tag]"
 project="mrjones/nwschart"
 imageName="gcr.io/mrjones-gke/nwschart"
 
+set -e
+
 if [ -z $1 ]
 then
     echo "Please supply a tag for this image"
@@ -19,6 +21,8 @@ fi
 
 echo "=== Compiling server binary"
 cargo build --color=never --release
+mkdir -p bin
+cp target/release/nwschart-server bin/server
 
 echo "=== Compiling JavaScript"
 webpack

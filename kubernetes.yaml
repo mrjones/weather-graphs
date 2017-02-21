@@ -1,0 +1,16 @@
+#  kubectl expose deployment nwschart --type=LoadBalancer --port=80 --target-port=3000
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nwschart
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        run: nwschart
+    spec:
+      containers:
+      - name: workouts
+        image: gcr.io/mrjones-gke/nwschart:2017-02-20.1
+        imagePullPolicy: IfNotPresent

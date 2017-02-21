@@ -228,8 +228,7 @@ impl hyper::server::Handler for WeatherServer {
                     Err(err) => res.send(format!("ERROR: {}", err).as_bytes()).unwrap(),
                 };
             },
-            "/google.js" => res.send(self.static_page("google.js").as_bytes()).unwrap(),
-            _ => res.send(self.static_page("index.html").as_bytes()).unwrap(),
+            _ => res.send(self.static_page("d3dash.html").as_bytes()).unwrap(),
         }
     }
 }
@@ -251,10 +250,11 @@ fn main() {
 
     let s = WeatherServer::new(&static_dir);
 
-    println!("--- Running!");
-    println!("---       Port: {}", port);
-    println!("--- Static dir: {}", static_dir);
-    println!("---");
+    println!("--- OPTIONS");
+    println!("--- * Port:       {}", port);
+    println!("--- * Static dir: {}", static_dir);
+    println!("");
+    println!("Ready to serve...");
     Server::http(
         std::net::SocketAddr::V4(
             std::net::SocketAddrV4::new(
